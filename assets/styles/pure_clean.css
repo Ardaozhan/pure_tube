@@ -1,0 +1,167 @@
+/* PureTube - YouTube Mobile Ad-Cleaning & AMOLED Dark Stylesheet */
+
+/* 1. Deep OLED Black Background */
+html, body, ytm-app, .page-container, .player-container {
+    background-color: #000000 !important;
+}
+
+/* 2. Hide All Banner Ads & Promoted Video Cards */
+ytd-promoted-video-renderer,
+ytd-promoted-sparkles-web-renderer,
+ytm-promoted-sparkles-web-renderer,
+ytm-companion-ad-renderer,
+ytd-action-companion-ad-renderer,
+ytd-display-ad-renderer,
+ytd-ad-slot-renderer,
+ytm-ad-slot-renderer,
+ytm-promoted-video-renderer,
+ytm-search-ad-renderer,
+#player-ads,
+.ad-container,
+.ad-display,
+.ytp-ad-overlay-container,
+.ytp-ad-message-container,
+.video-ads.ytp-ad-module {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* 3. Hide Clutter: App Download Prompts, Premium Upsells & Merch */
+ytm-app-banner,
+.mobile-topbar-header-sign-in-button,
+ytm-mealbar-promo-renderer,
+ytmusic-mealbar-promo-renderer,
+yt-upsell-dialog-renderer,
+ytmusic-upsell-dialog-renderer,
+ytmusic-app-navigation-bar-renderer,
+ytmusic-popup-container ytmusic-mealbar-promo-renderer,
+ytmusic-pivot-bar-renderer[aria-label*="Uygulama" i],
+ytmusic-pivot-bar-item-renderer[aria-label*="Uygulama" i],
+ytmusic-pivot-bar-item-renderer[aria-label*="App" i],
+ytmusic-open-in-app-renderer,
+.open-in-app,
+.open-in-app-button,
+ytmusic-nav-bar yt-button-renderer:has(a[href*="play.google.com"]),
+ytmusic-nav-bar a[href*="play.google.com"],
+ytmusic-nav-bar a[href*="market://"],
+[aria-label*="Uygulamayı aç" i],
+[aria-label*="Uygulamayı edinin" i],
+[aria-label*="Open app" i],
+[aria-label*="Get app" i],
+ytm-paid-content-overlay-renderer,
+ytm-merch-shelf-renderer,
+ytd-merch-shelf-renderer,
+ytm-survey-renderer,
+.yt-spec-bottom-sheet-layout__content[aria-label*="Premium"] {
+    display: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* 4. Smooth Video Player Styling & YouTube Music Styling */
+ytmusic-app, ytmusic-browse-response, ytmusic-player-page, ytmusic-nav-bar {
+    background-color: #000000 !important;
+}
+
+/* Make YT Music player bar slick and responsive */
+ytmusic-player-bar {
+    background-color: #111111 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.player-container {
+    background-color: #000000 !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* 5. Clean Top Header Bar */
+.mobile-topbar-header {
+    background-color: #0d0d0d !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 6. High-Performance Hardware-Accelerated Smooth Scrolling */
+* {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+html, body {
+    overscroll-behavior-y: contain !important;
+    scroll-behavior: smooth !important;
+}
+
+/* GPU Accelerated Layer Promotion */
+ytm-pivot-bar-renderer,
+ytmusic-nav-bar,
+ytmusic-player-bar,
+.player-container,
+video {
+    transform: translateZ(0) !important;
+    backface-visibility: hidden !important;
+    perspective: 1000px !important;
+}
+
+/* 7. Picture-in-Picture (PiP) Edge-to-Edge Video Fit */
+body.pure-pip-active {
+    overflow: hidden !important;
+    background-color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+body.pure-pip-active * {
+    transform: none !important;
+}
+
+body.pure-pip-active ytm-app,
+body.pure-pip-active ytm-watch,
+body.pure-pip-active ytm-player,
+body.pure-pip-active .player-container,
+body.pure-pip-active #player-container-id,
+body.pure-pip-active .html5-video-player,
+body.pure-pip-active .html5-video-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 2147483640 !important;
+    background: #000000 !important;
+}
+
+body.pure-pip-active video {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    object-fit: contain !important;
+    z-index: 2147483647 !important;
+    background: #000000 !important;
+}
+
+body.pure-pip-active .ytp-chrome-top,
+body.pure-pip-active .ytp-chrome-bottom,
+body.pure-pip-active .mobile-topbar-header,
+body.pure-pip-active ytm-pivot-bar-renderer,
+body.pure-pip-active ytm-item-section-renderer,
+body.pure-pip-active ytm-comments-entry-point-header-renderer,
+body.pure-pip-active .related-items,
+body.pure-pip-active ytm-single-column-watch-next-results-renderer-header,
+body.pure-pip-active ytm-watch-metadata {
+    display: none !important;
+}
