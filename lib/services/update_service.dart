@@ -33,8 +33,8 @@ class UpdateInfo {
 
 class UpdateService {
   // Mevcut uygulama sArAmA
-  static const String currentVersion = '1.0.0';
-  static const int currentBuildNumber = 1;
+  static const String currentVersion = '1.0.1';
+  static const int currentBuildNumber = 2;
 
   static const String repoOwner = 'Ardaozhan';
   static const String repoName = 'pure_tube';

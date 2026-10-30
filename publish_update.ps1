@@ -71,7 +71,7 @@ Write-Host "[3/4] APK hazirlandi: $targetApkName" -ForegroundColor Cyan
 # 5. Git Commit & Push
 Write-Host "[4/4] GitHub Releases'e yukleniyor..." -ForegroundColor Yellow
 git add .
-git commit -m "Release v$newVer: $Notes"
+git commit -m "Release v${newVer}: $Notes"
 git push -u origin main --force
 
 # 6. GitHub Release Olustur ve APK'yi yukle
