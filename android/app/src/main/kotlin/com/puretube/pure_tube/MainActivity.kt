@@ -331,8 +331,14 @@ class PureMediaSession(
             builder.setLargeIcon(cachedArtworkBitmap)
         }
 
+        val notification = builder.build()
         try {
-            activity.notificationManager?.notify(notificationId, builder.build())
+            if (isPlaying) {
+                PurePlaybackService.start(activity, notificationId, notification)
+            } else {
+                activity.notificationManager?.notify(notificationId, notification)
+                activity.checkShouldStopPlaybackService()
+            }
         } catch (e: Exception) {}
     }
 
@@ -342,6 +348,7 @@ class PureMediaSession(
             .setState(PlaybackStateCompat.STATE_STOPPED, 0, 0f)
             .build()
         mediaSession?.setPlaybackState(playbackState)
+        activity.checkShouldStopPlaybackService()
     }
 
     fun release() {
@@ -361,6 +368,12 @@ class MainActivity : FlutterActivity() {
     var notificationManager: NotificationManager? = null
     lateinit var ytSession: PureMediaSession
     lateinit var musicSession: PureMediaSession
+
+    fun checkShouldStopPlaybackService() {
+        if (!ytSession.isPlaying && !musicSession.isPlaying) {
+            PurePlaybackService.stop(this)
+        }
+    }
 
     private val mediaActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {

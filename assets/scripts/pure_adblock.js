@@ -204,10 +204,36 @@
             } catch(_) {}
         });
 
+        try {
+            Object.defineProperty(document, 'onvisibilitychange', { get: () => null, set: () => {}, configurable: true });
+        } catch(_) {}
+
         // Spoof document focus
         try {
             document.hasFocus = () => true;
         } catch(_) {}
+
+        // Keep requestAnimationFrame running smoothly when app is in background/screen off
+        if (typeof window.requestAnimationFrame === 'function') {
+            const _origRAF = window.requestAnimationFrame.bind(window);
+            window.requestAnimationFrame = function(callback) {
+                if (document.hidden || document.visibilityState === 'hidden' || !document.hasFocus()) {
+                    return setTimeout(() => callback(performance.now()), 16);
+                }
+                return _origRAF(callback);
+            };
+        }
+
+        // Prevent Web Audio Context suspension in background
+        if (window.AudioContext || window.webkitAudioContext) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx.prototype && AudioCtx.prototype.suspend) {
+                AudioCtx.prototype.suspend = function() {
+                    console.log('[PureTube] Blocked AudioContext.suspend()');
+                    return Promise.resolve();
+                };
+            }
+        }
 
         // 2. Block all events signaling background / loss of focus
         const backgroundEvents = [
@@ -225,48 +251,67 @@
             document.addEventListener(evt, (e) => e.stopImmediatePropagation(), true);
         });
 
-        // 3. Prevent programmatic pause() triggered by backgrounding (allow when requested by notification or user)
+        // Track deliberate user pause clicks vs background pause
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('button, [role="button"], yt-icon-button, tp-yt-paper-icon-button, .play-pause-button');
+            if (btn) {
+                const label = (btn.getAttribute('aria-label') || btn.innerText || btn.className || '').toLowerCase();
+                if (label.includes('pause') || label.includes('durdur')) {
+                    isUserPaused = true;
+                    console.log('[PureTube] Explicit user pause clicked on web player');
+                } else if (label.includes('play') || label.includes('oynat')) {
+                    isUserPaused = false;
+                    console.log('[PureTube] Explicit user play clicked on web player');
+                }
+            }
+        }, true);
+
+        // 3. Prevent programmatic pause() triggered by backgrounding (allow only when requested by notification or explicit user click)
         if (window.HTMLMediaElement && window.HTMLMediaElement.prototype) {
             const originalMediaPause = HTMLMediaElement.prototype.pause;
             HTMLMediaElement.prototype.pause = function(...args) {
                 if (isUserPaused) {
                     return originalMediaPause.apply(this, args);
                 }
-                const timeSinceUser = Date.now() - lastUserInteractionTime;
-                // If user touched screen in the last 2.5s, it was a deliberate touch on the web player
-                if (timeSinceUser <= 2500) {
-                    isUserPaused = true;
-                    return originalMediaPause.apply(this, args);
-                }
-                // Background inactivity pause attempt detected: block it!
-                console.log('[PureTube] Intercepted & prevented background pause (idle time: ' + timeSinceUser + 'ms)');
+                // Background inactivity pause attempt detected: block it completely!
+                console.log('[PureTube] Intercepted & prevented unwanted background pause on ' + this.tagName);
                 return Promise.resolve();
             };
 
-            // 4. Auto-resume fallback if video receives an unexpected pause event from background
-            document.addEventListener('pause', (e) => {
-                if (e.target && e.target.tagName === 'VIDEO') {
+            // 4. Auto-resume fallback if video/audio receives an unexpected pause event from background
+            const handleMediaPauseEvent = (e) => {
+                const el = e.target;
+                if (el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO')) {
                     if (isUserPaused) return; // Deliberate user pause! Keep it paused!
-                    const timeSinceUser = Date.now() - lastUserInteractionTime;
-                    if (timeSinceUser > 2500) {
-                        console.log('[PureTube] Auto-resuming video after background pause event');
-                        setTimeout(() => {
-                            if (!isUserPaused) {
-                                try { e.target.play(); } catch(_) {}
-                            }
-                        }, 50);
-                    } else {
-                        isUserPaused = true;
-                    }
+                    console.log('[PureTube] Auto-resuming media element after unexpected pause event in background');
+                    setTimeout(() => {
+                        if (!isUserPaused) {
+                            try { el.play(); } catch(_) {}
+                        }
+                    }, 20);
                 }
-            }, true);
+            };
+            document.addEventListener('pause', handleMediaPauseEvent, true);
+            window.addEventListener('pause', handleMediaPauseEvent, true);
 
-            document.addEventListener('play', (e) => {
-                if (e.target && e.target.tagName === 'VIDEO') {
+            const handleMediaPlayEvent = (e) => {
+                const el = e.target;
+                if (el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO')) {
                     isUserPaused = false;
                 }
                 syncMediaMetadata();
-            }, true);
+            };
+            document.addEventListener('play', handleMediaPlayEvent, true);
+            window.addEventListener('play', handleMediaPlayEvent, true);
+
+            // 5. Active Media Watchdog: keeps audio buffer feeding and prevents stalls
+            setInterval(() => {
+                const media = document.querySelector('video') || document.querySelector('audio');
+                if (media && media.paused && !isUserPaused && media.currentTime > 0 && media.currentTime < (media.duration - 0.5)) {
+                    console.log('[PureTube Watchdog] Waking up stalled media element in background');
+                    try { media.play(); } catch(_) {}
+                }
+            }, 1500);
         }
 
         // 5. Keep Screen Awake via Web API when playing
