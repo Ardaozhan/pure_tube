@@ -33,8 +33,8 @@ class UpdateInfo {
 
 class UpdateService {
   // Mevcut uygulama sArAmA
-  static const String currentVersion = '1.0.2';
-  static const int currentBuildNumber = 3;
+  static const String currentVersion = '3.0.0';
+  static const int currentBuildNumber = 5;
 
   static const String repoOwner = 'Ardaozhan';
   static const String repoName = 'pure_tube';
@@ -187,15 +187,32 @@ class UpdateService {
     }
   }
 
-  /// Uygulama aA AldAAYAnda sessizce kontrol eder, gAncelleme varsa diyaloAYu aA ar
+  /// Uygulama açıldığında sessizce kontrol eder, güncelleme varsa diyaloğu açar
   static Future<void> checkOnStartup(BuildContext context) async {
-    // 3 saniye gecikmeyle aA AlAAY takAlmasAnA Anle
+    // 3 saniye gecikmeyle açılış takılmasını önle
     await Future.delayed(const Duration(seconds: 3));
     if (!context.mounted) return;
 
     final update = await checkForUpdate();
     if (update != null && context.mounted) {
       showUpdateDialog(context, update);
+    }
+  }
+
+  /// Manuel veya otomatik güncelleme denetimi
+  static Future<void> check(BuildContext context, {bool isManual = false}) async {
+    final update = await checkForUpdate();
+    if (!context.mounted) return;
+    if (update != null) {
+      showUpdateDialog(context, update);
+    } else if (isManual) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🎉 Tebrikler! PureTube en güncel sürümde.'),
+          duration: Duration(seconds: 2),
+          backgroundColor: Color(0xFF2E7D32),
+        ),
+      );
     }
   }
 

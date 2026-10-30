@@ -1,11 +1,83 @@
-/* PureTube - YouTube Mobile Ad-Cleaning & AMOLED Dark Stylesheet */
+/* PureTube - YouTube Mobile Ad-Cleaning, SponsorBlock, RYD & Pure AMOLED Stylesheet */
 
-/* 1. Deep OLED Black Background */
-html, body, ytm-app, .page-container, .player-container {
+/* ==========================================================================
+   1. TRUE PITCH-BLACK (#000000) AMOLED STYLING (YOUTUBE & YOUTUBE MUSIC)
+   ========================================================================== */
+html,
+body,
+ytm-app,
+ytm-watch,
+ytm-player,
+ytm-pivot-bar-renderer,
+ytm-single-column-watch-next-results-renderer,
+ytm-item-section-renderer,
+ytm-section-list-renderer,
+ytm-compact-video-renderer,
+ytm-slim-owner-renderer,
+ytm-comment-section-renderer,
+ytm-comments-entry-point-header-renderer,
+ytm-engagement-panel,
+ytm-search,
+.page-container,
+.player-container,
+#player-container-id,
+#app,
+#content,
+#contents,
+#chips,
+ytm-chip-cloud-renderer {
     background-color: #000000 !important;
+    background: #000000 !important;
 }
 
-/* 2. Hide All Banner Ads & Promoted Video Cards */
+/* YouTube Music Full AMOLED Pitch-Black Overrides */
+ytmusic-app,
+ytmusic-browse-response,
+ytmusic-player-page,
+ytmusic-nav-bar,
+ytmusic-pivot-bar-renderer,
+ytmusic-search-page,
+ytmusic-section-list-renderer,
+ytmusic-tabs,
+ytmusic-sheet-renderer,
+ytmusic-player-bar,
+.ytmusic-player-page,
+#player-page {
+    background-color: #000000 !important;
+    background: #000000 !important;
+}
+
+/* Make YT Music bottom player bar sleek OLED with micro-border */
+ytmusic-player-bar {
+    background-color: #000000 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* YouTube Mobile Bottom Navigation & Top Header AMOLED */
+ytm-pivot-bar-renderer {
+    background-color: #000000 !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.mobile-topbar-header {
+    background-color: #000000 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.player-container {
+    background-color: #000000 !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Dialogs, sheets, bottom drawer AMOLED */
+ytm-menu-renderer,
+.yt-spec-bottom-sheet-layout__content {
+    background-color: #0a0a0a !important;
+}
+
+/* ==========================================================================
+   2. HIDE ALL BANNER ADS, PROMOTIONS & MERCH SHELVES
+   ========================================================================== */
 ytd-promoted-video-renderer,
 ytd-promoted-sparkles-web-renderer,
 ytm-promoted-sparkles-web-renderer,
@@ -21,7 +93,24 @@ ytm-search-ad-renderer,
 .ad-display,
 .ytp-ad-overlay-container,
 .ytp-ad-message-container,
-.video-ads.ytp-ad-module {
+.video-ads.ytp-ad-module,
+ytm-mealbar-promo-renderer,
+ytmusic-mealbar-promo-renderer,
+yt-upsell-dialog-renderer,
+ytmusic-upsell-dialog-renderer,
+ytmusic-app-navigation-bar-renderer,
+ytmusic-popup-container ytmusic-mealbar-promo-renderer,
+ytmusic-open-in-app-renderer,
+.open-in-app,
+.open-in-app-button,
+ytmusic-banner-renderer,
+ytm-paid-content-overlay-renderer,
+ytm-merch-shelf-renderer,
+ytd-merch-shelf-renderer,
+ytm-survey-renderer,
+ytm-app-banner,
+.mobile-topbar-header-sign-in-button,
+.yt-spec-bottom-sheet-layout__content[aria-label*="Premium"] {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
@@ -30,70 +119,152 @@ ytm-search-ad-renderer,
     pointer-events: none !important;
 }
 
-/* 3. Hide Clutter: App Download Prompts, Premium Upsells & Merch */
-ytm-app-banner,
-.mobile-topbar-header-sign-in-button,
-ytm-mealbar-promo-renderer,
-ytmusic-mealbar-promo-renderer,
-yt-upsell-dialog-renderer,
-ytmusic-upsell-dialog-renderer,
-ytmusic-app-navigation-bar-renderer,
-ytmusic-popup-container ytmusic-mealbar-promo-renderer,
-ytmusic-pivot-bar-renderer[aria-label*="Uygulama" i],
-ytmusic-pivot-bar-item-renderer[aria-label*="Uygulama" i],
-ytmusic-pivot-bar-item-renderer[aria-label*="App" i],
-ytmusic-open-in-app-renderer,
-.open-in-app,
-.open-in-app-button,
-ytmusic-nav-bar yt-button-renderer:has(a[href*="play.google.com"]),
-ytmusic-nav-bar a[href*="play.google.com"],
-ytmusic-nav-bar a[href*="market://"],
-[aria-label*="Uygulamayı aç" i],
-[aria-label*="Uygulamayı edinin" i],
-[aria-label*="Open app" i],
-[aria-label*="Get app" i],
-ytm-paid-content-overlay-renderer,
-ytm-merch-shelf-renderer,
-ytd-merch-shelf-renderer,
-ytm-survey-renderer,
-.yt-spec-bottom-sheet-layout__content[aria-label*="Premium"] {
+/* ==========================================================================
+   3. ANTI-ADBLOCK MODAL & SSAI ENFORCEMENT SUPPRESSION
+   ========================================================================== */
+ytd-enforcement-message-view-model,
+yt-playability-error-supported-renderers,
+.yt-playability-error-supported-renderers,
+tp-yt-paper-dialog:has(#feedback),
+tp-yt-iron-overlay-backdrop,
+ytd-popup-container:has(ytd-enforcement-message-view-model),
+.opened[modal] {
     display: none !important;
-    height: 0 !important;
-    width: 0 !important;
     visibility: hidden !important;
     opacity: 0 !important;
     pointer-events: none !important;
+    height: 0 !important;
+    width: 0 !important;
 }
 
-/* 4. Smooth Video Player Styling & YouTube Music Styling */
-ytmusic-app, ytmusic-browse-response, ytmusic-player-page, ytmusic-nav-bar {
-    background-color: #000000 !important;
+/* ==========================================================================
+   4. RETURN YOUTUBE DISLIKE (RYD) STYLING & RATIO BAR
+   ========================================================================== */
+#puretube-ryd-bar {
+    display: flex !important;
+    width: 100% !important;
+    height: 3px !important;
+    border-radius: 2px !important;
+    overflow: hidden !important;
+    margin-top: 6px !important;
+    margin-bottom: 6px !important;
+    background-color: rgba(255, 255, 255, 0.14) !important;
+    box-sizing: border-box !important;
+    transition: opacity 0.25s ease !important;
 }
 
-/* Make YT Music player bar slick and responsive */
-ytmusic-player-bar {
-    background-color: #111111 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+#puretube-ryd-bar .puretube-ryd-likes {
+    height: 100% !important;
+    background-color: #00d66c !important; /* Pure clean green */
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-.player-container {
-    background-color: #000000 !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6) !important;
+#puretube-ryd-bar .puretube-ryd-dislikes {
+    height: 100% !important;
+    background-color: #ff334b !important; /* Pure clean crimson */
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* 5. Clean Top Header Bar */
-.mobile-topbar-header {
-    background-color: #0d0d0d !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+.puretube-ryd-count {
+    margin-left: 6px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: inherit !important;
+    display: inline-block !important;
+    vertical-align: middle !important;
 }
 
-/* 6. High-Performance Hardware-Accelerated Smooth Scrolling */
+/* ==========================================================================
+   5. SPONSORBLOCK SEEKBAR OVERLAYS & FLOATING BADGE
+   ========================================================================== */
+#puretube-sb-segments {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    pointer-events: none !important;
+    z-index: 20 !important;
+    overflow: hidden !important;
+    border-radius: inherit !important;
+}
+
+.puretube-sb-segment {
+    position: absolute !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    height: 100% !important;
+    opacity: 0.85 !important;
+    pointer-events: none !important;
+    z-index: 21 !important;
+    border-radius: 1px !important;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Minimal non-intrusive floating pill indicating skipped sponsor */
+#puretube-sponsor-badge {
+    position: fixed !important;
+    bottom: 74px !important;
+    right: 16px !important;
+    background: rgba(14, 14, 14, 0.94) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 20px !important;
+    padding: 7px 14px 7px 10px !important;
+    font-size: 12.5px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    z-index: 2147483640 !important;
+    opacity: 0 !important;
+    transform: translateY(8px) scale(0.96) !important;
+    pointer-events: auto !important;
+    transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+#puretube-sponsor-badge.puretube-badge-visible {
+    opacity: 1 !important;
+    transform: translateY(0) scale(1) !important;
+}
+
+#puretube-sponsor-badge .puretube-badge-icon {
+    width: 16px !important;
+    height: 16px !important;
+    color: #00e676 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+
+#puretube-sponsor-badge .puretube-badge-text {
+    line-height: 1.2 !important;
+}
+
+#puretube-sponsor-badge .puretube-badge-undo {
+    color: #64b5f6 !important;
+    cursor: pointer !important;
+    margin-left: 6px !important;
+    text-decoration: underline !important;
+    font-weight: 600 !important;
+    font-size: 11.5px !important;
+}
+
+/* ==========================================================================
+   6. HIGH-PERFORMANCE HARDWARE-ACCELERATED SMOOTH SCROLLING
+   ========================================================================== */
 * {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-overflow-scrolling: touch !important;
 }
 
-html, body {
+html,
+body {
     overscroll-behavior-y: contain !important;
     scroll-behavior: smooth !important;
 }
@@ -109,7 +280,9 @@ video {
     perspective: 1000px !important;
 }
 
-/* 7. Picture-in-Picture (PiP) Edge-to-Edge Video Fit */
+/* ==========================================================================
+   7. PICTURE-IN-PICTURE (PIP) EDGE-TO-EDGE VIDEO FIT
+   ========================================================================== */
 body.pure-pip-active {
     overflow: hidden !important;
     background-color: #000000 !important;
@@ -162,6 +335,8 @@ body.pure-pip-active ytm-item-section-renderer,
 body.pure-pip-active ytm-comments-entry-point-header-renderer,
 body.pure-pip-active .related-items,
 body.pure-pip-active ytm-single-column-watch-next-results-renderer-header,
-body.pure-pip-active ytm-watch-metadata {
+body.pure-pip-active ytm-watch-metadata,
+body.pure-pip-active #puretube-ryd-bar,
+body.pure-pip-active #puretube-sponsor-badge {
     display: none !important;
 }

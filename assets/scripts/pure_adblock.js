@@ -1,11 +1,11 @@
-// PureTube - Advanced Zero-Ad Engine, SponsorBlock & Usability Core
+// PureTube - Advanced Zero-Ad Engine, SponsorBlock v2, Return YouTube Dislike & Usability Core
 (function() {
     'use strict';
 
     if (window.__pureTubeInjected) return;
     window.__pureTubeInjected = true;
 
-    // --- 1. ZERO-AD JSON RESPONSE INTERCEPTOR (ROOT CAUSE FIX) ---
+    // --- 1. ZERO-AD JSON RESPONSE INTERCEPTOR & ANTI-ADBLOCK BYPASS ---
     // Intercept YouTube's internal player & browse API so YouTube NEVER receives or renders ads!
     function stripAdsFromJson(json) {
         let modified = false;
@@ -15,7 +15,12 @@
             if (stripAdsFromJson(json.playerResponse)) modified = true;
         }
 
-        const adKeys = ['adPlacements', 'playerAds', 'adSlots', 'cueRanges', 'adBreakHeartbeatParams'];
+        // Strip all known ad payloads, SSAI cue ranges and ad slots
+        const adKeys = [
+            'adPlacements', 'playerAds', 'adSlots', 'cueRanges', 
+            'adBreakHeartbeatParams', 'adBreakService', 'adBreakRenderer',
+            'adBreakResponse', 'adBreakParams'
+        ];
         for (const key of adKeys) {
             if (json[key] !== undefined) {
                 if (Array.isArray(json[key])) json[key] = [];
@@ -27,7 +32,24 @@
         if (json.playbackTracking) {
             if (json.playbackTracking.atrUrl) delete json.playbackTracking.atrUrl;
             if (json.playbackTracking.qoeUrl) delete json.playbackTracking.qoeUrl;
+            if (json.playbackTracking.ptrackingUrl) delete json.playbackTracking.ptrackingUrl;
         }
+
+        // Anti-Adblock modal suppression in playabilityStatus
+        if (json.playabilityStatus && typeof json.playabilityStatus === 'object') {
+            const status = json.playabilityStatus.status;
+            const reason = (json.playabilityStatus.reason || '').toLowerCase();
+            if (status !== 'OK') {
+                if (reason.includes('ad blocker') || reason.includes('reklam engelle') || reason.includes('terms of service')) {
+                    json.playabilityStatus.status = 'OK';
+                    delete json.playabilityStatus.reason;
+                    delete json.playabilityStatus.messages;
+                    delete json.playabilityStatus.errorScreen;
+                    modified = true;
+                }
+            }
+        }
+
         return modified;
     }
 
@@ -115,7 +137,7 @@
             return response;
         };
 
-        // Also hook XMLHttpRequest for player API calls and ad trackings
+        // Hook XMLHttpRequest for player API calls and ad trackings
         const originalOpen = XMLHttpRequest.prototype.open;
         const originalSend = XMLHttpRequest.prototype.send;
         XMLHttpRequest.prototype.open = function(method, url) {
@@ -179,7 +201,6 @@
     }
 
     try {
-        // Track recent human interactions (touch, click, pointer)
         const markUserInteraction = () => {
             lastUserInteractionTime = Date.now();
         };
@@ -188,7 +209,7 @@
             document.addEventListener(evt, markUserInteraction, { capture: true, passive: true });
         });
 
-        // 1. Spoof Page Visibility API across all standards
+        // Spoof Page Visibility API across all standards
         const falseGetter = () => false;
         const visibleGetter = () => 'visible';
         
@@ -208,12 +229,10 @@
             Object.defineProperty(document, 'onvisibilitychange', { get: () => null, set: () => {}, configurable: true });
         } catch(_) {}
 
-        // Spoof document focus
         try {
             document.hasFocus = () => true;
         } catch(_) {}
 
-        // Keep requestAnimationFrame running smoothly when app is in background/screen off
         if (typeof window.requestAnimationFrame === 'function') {
             const _origRAF = window.requestAnimationFrame.bind(window);
             window.requestAnimationFrame = function(callback) {
@@ -224,7 +243,6 @@
             };
         }
 
-        // Prevent Web Audio Context suspension in background
         if (window.AudioContext || window.webkitAudioContext) {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (AudioCtx.prototype && AudioCtx.prototype.suspend) {
@@ -235,7 +253,6 @@
             }
         }
 
-        // 2. Block all events signaling background / loss of focus
         const backgroundEvents = [
             'visibilitychange',
             'webkitvisibilitychange',
@@ -251,7 +268,6 @@
             document.addEventListener(evt, (e) => e.stopImmediatePropagation(), true);
         });
 
-        // Track deliberate user pause clicks vs background pause
         document.addEventListener('click', (e) => {
             const btn = e.target.closest('button, [role="button"], yt-icon-button, tp-yt-paper-icon-button, .play-pause-button');
             if (btn) {
@@ -266,24 +282,20 @@
             }
         }, true);
 
-        // 3. Prevent programmatic pause() triggered by backgrounding (allow only when requested by notification or explicit user click)
         if (window.HTMLMediaElement && window.HTMLMediaElement.prototype) {
             const originalMediaPause = HTMLMediaElement.prototype.pause;
             HTMLMediaElement.prototype.pause = function(...args) {
                 if (isUserPaused) {
                     return originalMediaPause.apply(this, args);
                 }
-                // Background inactivity pause attempt detected: block it completely!
                 console.log('[PureTube] Intercepted & prevented unwanted background pause on ' + this.tagName);
                 return Promise.resolve();
             };
 
-            // 4. Auto-resume fallback if video/audio receives an unexpected pause event from background
             const handleMediaPauseEvent = (e) => {
                 const el = e.target;
                 if (el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO')) {
-                    if (isUserPaused) return; // Deliberate user pause! Keep it paused!
-                    console.log('[PureTube] Auto-resuming media element after unexpected pause event in background');
+                    if (isUserPaused) return;
                     setTimeout(() => {
                         if (!isUserPaused) {
                             try { el.play(); } catch(_) {}
@@ -304,7 +316,6 @@
             document.addEventListener('play', handleMediaPlayEvent, true);
             window.addEventListener('play', handleMediaPlayEvent, true);
 
-            // 5. Active Media Watchdog: keeps audio buffer feeding and prevents stalls
             setInterval(() => {
                 const media = document.querySelector('video') || document.querySelector('audio');
                 if (media && media.paused && !isUserPaused && media.currentTime > 0 && media.currentTime < (media.duration - 0.5)) {
@@ -314,7 +325,6 @@
             }, 1500);
         }
 
-        // 5. Keep Screen Awake via Web API when playing
         if ('wakeLock' in navigator) {
             let wakeLock = null;
             const requestWakeLock = async () => {
@@ -334,18 +344,70 @@
         console.warn('[PureTube] Background playback patch error:', e);
     }
 
-    // --- 3. CONFIGURATION & STATE ---
-    let sponsorSegments = [];
+    // --- 3. CONFIGURATION, STATE & CATEGORY METRICS ---
     let currentVideoId = '';
+    let sponsorSegments = [];
     let sponsorBlockEnabled = true;
     let adBlockEnabled = true;
     let blockedAdsCount = 0;
     let adWasPlaying = false;
+    let lastSkippedSegment = null;
+
+    // RYD (Return YouTube Dislike) State
+    let currentRydVotes = null;
+    let lastRydVideoId = '';
+    let rydFetchInProgress = false;
+
+    const SB_COLORS = {
+        sponsor: '#00d66c',        // Emerald Green
+        intro: '#00e5ff',          // Cyan
+        intermission: '#00e5ff',   // Cyan
+        outro: '#3d5afe',          // Indigo / Blue
+        selfpromo: '#ffeb3b',      // Amber Yellow
+        interaction: '#e040fb',    // Neon Magenta
+        music_offtopic: '#ff9100', // Orange
+        preview: '#00b0ff'         // Light Blue
+    };
+
+    const SB_TITLES = {
+        sponsor: 'Sponsor',
+        intro: 'İntro / Giriş',
+        intermission: 'Ara',
+        outro: 'Bitiş / Jenerik',
+        selfpromo: 'Kişisel Tanıtım',
+        interaction: 'Abone Ol / Beğen',
+        music_offtopic: 'Konu Dışı Müzik',
+        preview: 'Önizleme'
+    };
 
     function notifyFlutter(event, data) {
         if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
             window.flutter_inappwebview.callHandler(event, data);
         }
+    }
+
+    function formatMetric(num) {
+        if (typeof num !== 'number' || isNaN(num)) return '0';
+        if (num >= 1e9) {
+            const v = (num / 1e9).toFixed(1);
+            return (v.endsWith('.0') ? v.slice(0, -2) : v) + 'B';
+        }
+        if (num >= 1e6) {
+            const v = (num / 1e6).toFixed(1);
+            return (v.endsWith('.0') ? v.slice(0, -2) : v) + 'M';
+        }
+        if (num >= 1e3) {
+            const v = (num / 1e3).toFixed(1);
+            return (v.endsWith('.0') ? v.slice(0, -2) : v) + 'K';
+        }
+        return String(num);
+    }
+
+    function formatTimestamp(seconds) {
+        if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) return '0:00';
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60);
+        return m + ':' + (s < 10 ? '0' : '') + s;
     }
 
     // --- 4. VIDEO ID EXTRACTION ---
@@ -358,7 +420,6 @@
         match = url.match(/\/watch\/([^&#/?]+)/);
         if (match) return match[1];
 
-        // YouTube Music active player bar fallback
         try {
             const playerBarLink = document.querySelector('ytmusic-player-bar a[href*="watch?v="]');
             if (playerBarLink) {
@@ -370,26 +431,152 @@
         return null;
     }
 
-    // --- 5. SPONSORBLOCK INTEGRATION ---
+    // --- 5. SPONSORBLOCK V2 API & SEEKBAR SEGMENTS ---
+    function findProgressBarTrack() {
+        return document.querySelector(
+            '.ytp-progress-bar, ' +
+            '.segmented-progress-bar, ' +
+            '.ytp-progress-list, ' +
+            '.ytm-progress-bar, ' +
+            'ytm-progress-bar, ' +
+            '.chapter-hover-container'
+        );
+    }
+
+    function removeSeekbarSegments() {
+        const old = document.getElementById('puretube-sb-segments');
+        if (old) old.remove();
+    }
+
+    function renderSeekbarSegments() {
+        if (!sponsorBlockEnabled || sponsorSegments.length === 0) {
+            removeSeekbarSegments();
+            return;
+        }
+
+        const track = findProgressBarTrack();
+        const video = document.querySelector('video');
+        if (!track || !video || !isFinite(video.duration) || video.duration <= 0) return;
+
+        const duration = video.duration;
+        let container = document.getElementById('puretube-sb-segments');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'puretube-sb-segments';
+            track.style.position = 'relative';
+            track.appendChild(container);
+        } else if (container.parentElement !== track) {
+            track.appendChild(container);
+        }
+
+        container.innerHTML = '';
+        for (let i = 0; i < sponsorSegments.length; i++) {
+            const seg = sponsorSegments[i];
+            if (seg.start >= duration) continue;
+
+            const startPct = Math.max(0, Math.min(100, (seg.start / duration) * 100));
+            const endPct = Math.max(0, Math.min(100, (seg.end / duration) * 100));
+            const widthPct = Math.max(0.4, endPct - startPct);
+
+            const segEl = document.createElement('div');
+            segEl.className = 'puretube-sb-segment';
+            segEl.style.left = startPct + '%';
+            segEl.style.width = widthPct + '%';
+            segEl.style.backgroundColor = SB_COLORS[seg.category] || '#00d66c';
+            segEl.title = `${SB_TITLES[seg.category] || seg.category} (${formatTimestamp(seg.start)} - ${formatTimestamp(seg.end)})`;
+            container.appendChild(segEl);
+        }
+    }
+
     async function fetchSponsorBlockSegments(videoId) {
         if (!videoId || !sponsorBlockEnabled) return;
         try {
-            const url = `https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=["sponsor","intro","outro","interaction","selfpromo"]`;
+            // 1. Try Flutter bridge first
+            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+                try {
+                    const bridgeRes = await window.flutter_inappwebview.callHandler('fetchSponsorSegments', { videoId: videoId });
+                    if (Array.isArray(bridgeRes) && bridgeRes.length > 0) {
+                        sponsorSegments = bridgeRes.map(item => ({
+                            start: item.startTime !== undefined ? Number(item.startTime) : (item.segment ? Number(item.segment[0]) : 0),
+                            end: item.endTime !== undefined ? Number(item.endTime) : (item.segment ? Number(item.segment[1]) : 0),
+                            category: item.category || 'sponsor',
+                            uuid: item.UUID || item.uuid || ''
+                        }));
+                        renderSeekbarSegments();
+                        return;
+                    }
+                } catch(_) {}
+            }
+
+            // 2. Direct SponsorBlock v2 API fallback
+            const categories = '["sponsor","intro","outro","selfpromo","interaction","music_offtopic"]';
+            const url = `https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=${encodeURIComponent(categories)}`;
             const resp = await fetch(url);
             if (resp.status === 200) {
                 const data = await resp.json();
-                sponsorSegments = data.map(item => ({
-                    start: item.segment[0],
-                    end: item.segment[1],
-                    category: item.category
-                }));
-                showToast(`SponsorBlock: ${sponsorSegments.length} sponsor bölümü yüklendi`);
+                if (Array.isArray(data)) {
+                    sponsorSegments = data.map(item => ({
+                        start: item.segment ? item.segment[0] : (item.startTime || 0),
+                        end: item.segment ? item.segment[1] : (item.endTime || 0),
+                        category: item.category || 'sponsor',
+                        uuid: item.UUID || item.uuid || ''
+                    }));
+                    renderSeekbarSegments();
+                }
             } else {
                 sponsorSegments = [];
+                removeSeekbarSegments();
             }
         } catch (e) {
             sponsorSegments = [];
+            removeSeekbarSegments();
         }
+    }
+
+    let badgeTimer = null;
+    function showSponsorBadge(seg, fromTime) {
+        let badge = document.getElementById('puretube-sponsor-badge');
+        if (!badge) {
+            badge = document.createElement('div');
+            badge.id = 'puretube-sponsor-badge';
+            document.body.appendChild(badge);
+        }
+
+        lastSkippedSegment = {
+            from: fromTime,
+            to: seg.end,
+            segment: seg
+        };
+
+        const catTitle = SB_TITLES[seg.category] || 'Sponsor';
+        badge.innerHTML = `
+            <span class="puretube-badge-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 2v11h3v9l7-12h-4l4-8z"/>
+                </svg>
+            </span>
+            <span class="puretube-badge-text">${catTitle} atlandı (SponsorBlock)</span>
+            <span class="puretube-badge-undo">Geri Al</span>
+        `;
+
+        const undoBtn = badge.querySelector('.puretube-badge-undo');
+        if (undoBtn) {
+            undoBtn.onclick = (e) => {
+                e.stopPropagation();
+                const video = document.querySelector('video');
+                if (video && lastSkippedSegment) {
+                    video.currentTime = Math.max(0, lastSkippedSegment.from - 0.5);
+                    showToast('Geri alındı');
+                }
+                badge.classList.remove('puretube-badge-visible');
+            };
+        }
+
+        badge.classList.add('puretube-badge-visible');
+        clearTimeout(badgeTimer);
+        badgeTimer = setTimeout(() => {
+            badge.classList.remove('puretube-badge-visible');
+        }, 3200);
     }
 
     function checkSponsorBlock(video) {
@@ -397,21 +584,172 @@
         const cur = video.currentTime;
         for (let i = 0; i < sponsorSegments.length; i++) {
             const seg = sponsorSegments[i];
-            if (cur >= seg.start && cur < seg.end - 0.5) {
+            if (cur >= seg.start && cur < (seg.end - 0.25)) {
+                const from = cur;
                 video.currentTime = seg.end;
-                showToast(`⚡ Sponsor atlandı (${seg.category})`);
+                showSponsorBadge(seg, from);
                 break;
             }
         }
     }
 
-    // --- 6. INSTANT 0-MS VIDEO AD CLEANER ---
+    // --- 6. RETURN YOUTUBE DISLIKE (RYD) DOM INJECTOR ---
+    async function fetchRydData(videoId) {
+        if (!videoId || rydFetchInProgress) return;
+        if (lastRydVideoId === videoId && currentRydVotes) {
+            injectRydDom(currentRydVotes);
+            return;
+        }
+
+        rydFetchInProgress = true;
+        lastRydVideoId = videoId;
+
+        try {
+            // 1. Try Flutter bridge first
+            if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+                try {
+                    const bridgeRes = await window.flutter_inappwebview.callHandler('fetchRydVotes', { videoId: videoId });
+                    if (bridgeRes && typeof bridgeRes === 'object' && bridgeRes.likes !== undefined) {
+                        currentRydVotes = bridgeRes;
+                        injectRydDom(currentRydVotes);
+                        rydFetchInProgress = false;
+                        return;
+                    }
+                } catch(_) {}
+            }
+
+            // 2. Direct RYD API fallback
+            const resp = await fetch(`https://returnyoutubedislikeapi.com/votes?videoId=${videoId}`);
+            if (resp.status === 200) {
+                const data = await resp.json();
+                const likes = Number(data.likes) || 0;
+                const dislikes = Number(data.dislikes) || 0;
+                const total = likes + dislikes;
+                const likePct = total > 0 ? (likes / total) * 100 : (likes > 0 ? 100 : 0);
+                currentRydVotes = {
+                    videoId: videoId,
+                    likes: likes,
+                    dislikes: dislikes,
+                    rating: Number(data.rating) || 0,
+                    viewCount: Number(data.viewCount) || 0,
+                    formattedLikes: formatMetric(likes),
+                    formattedDislikes: formatMetric(dislikes),
+                    likePercentage: likePct
+                };
+                injectRydDom(currentRydVotes);
+            }
+        } catch(e) {
+            console.warn('[PureTube RYD] Fetch error:', e);
+        } finally {
+            rydFetchInProgress = false;
+        }
+    }
+
+    function findDislikeButton() {
+        const selectors = [
+            'dislike-button-view-model button',
+            'like-button-view-model + dislike-button-view-model button',
+            'ytm-segmented-like-dislike-button-renderer ytm-toggle-button-renderer:nth-child(2) button',
+            'ytm-segmented-like-dislike-button-renderer button[aria-label*="dislike" i]',
+            'ytm-segmented-like-dislike-button-renderer button[aria-label*="beğenme" i]',
+            'button.segmented-buttons-wrapper__button:nth-child(2)',
+            '#dislike-button',
+            'button[aria-label*="dislike" i]',
+            'button[aria-label*="beğenme" i]',
+            '.slim-video-action-bar-actions ytm-toggle-button-renderer:nth-child(2) button',
+            '.slim-video-action-bar-actions button:nth-child(2)'
+        ];
+
+        for (const sel of selectors) {
+            const btn = document.querySelector(sel);
+            if (btn) return btn;
+        }
+        return null;
+    }
+
+    function findActionBarContainer() {
+        return document.querySelector(
+            'ytm-segmented-like-dislike-button-renderer, ' +
+            'segmented-like-dislike-button-view-model, ' +
+            '.slim-video-action-bar-actions, ' +
+            'ytm-slim-video-action-bar-renderer, ' +
+            '#actions.ytd-watch-metadata, ' +
+            '#top-level-buttons-computed, ' +
+            '.ytm-slim-video-action-bar'
+        );
+    }
+
+    function injectRydDom(votes) {
+        if (!votes) return;
+
+        // 1. Insert/update dislike count on dislike button in YouTube mobile DOM
+        const dislikeBtn = findDislikeButton();
+        if (dislikeBtn) {
+            let countSpan = dislikeBtn.querySelector('.puretube-ryd-count');
+            if (!countSpan) {
+                countSpan = document.createElement('span');
+                countSpan.className = 'puretube-ryd-count';
+                const textTarget = dislikeBtn.querySelector('.cbox, .yt-spec-button-shape-next__button-text-content, .button-renderer-text') || dislikeBtn;
+                textTarget.appendChild(countSpan);
+            }
+            countSpan.textContent = votes.formattedDislikes || formatMetric(votes.dislikes);
+            dislikeBtn.setAttribute('title', `${votes.dislikes.toLocaleString()} dislike`);
+        }
+
+        // 2. Add clean thin like/dislike ratio bar beneath the action bar
+        const actionBar = findActionBarContainer();
+        if (actionBar) {
+            let rydBar = document.getElementById('puretube-ryd-bar');
+            if (!rydBar) {
+                rydBar = document.createElement('div');
+                rydBar.id = 'puretube-ryd-bar';
+                rydBar.innerHTML = `
+                    <div class="puretube-ryd-likes"></div>
+                    <div class="puretube-ryd-dislikes"></div>
+                `;
+                if (actionBar.parentNode) {
+                    actionBar.parentNode.insertBefore(rydBar, actionBar.nextSibling);
+                }
+            }
+
+            const likePct = Math.max(0, Math.min(100, votes.likePercentage || 0));
+            const dislikePct = 100 - likePct;
+            const likesEl = rydBar.querySelector('.puretube-ryd-likes');
+            const dislikesEl = rydBar.querySelector('.puretube-ryd-dislikes');
+            if (likesEl) likesEl.style.width = likePct + '%';
+            if (dislikesEl) dislikesEl.style.width = dislikePct + '%';
+            rydBar.setAttribute('title', `${votes.formattedLikes || votes.likes} beğeni / ${votes.formattedDislikes || votes.dislikes} beğenmeme (%${likePct.toFixed(1)})`);
+        }
+    }
+
+    // --- 7. INSTANT 0-MS VIDEO AD CLEANER & ANTI-SSAI HARDENING ---
+    function dismissAntiAdblockModals() {
+        const modals = document.querySelectorAll(
+            'ytd-enforcement-message-view-model, ' +
+            'yt-playability-error-supported-renderers, ' +
+            '.yt-playability-error-supported-renderers, ' +
+            'tp-yt-paper-dialog:has(#feedback), ' +
+            'tp-yt-iron-overlay-backdrop, ' +
+            'ytd-popup-container:has(ytd-enforcement-message-view-model), ' +
+            '.opened[modal]'
+        );
+        if (modals.length > 0) {
+            modals.forEach(el => {
+                try { el.remove(); } catch(_) {}
+            });
+            const video = document.querySelector('video');
+            if (video && video.paused && !isUserPaused && video.currentTime > 0) {
+                try { video.play(); } catch(_) {}
+            }
+        }
+    }
+
     function isAdPlayingNow() {
         const player = document.querySelector('.html5-video-player') || document.getElementById('movie_player');
         if (player && (player.classList.contains('ad-showing') || player.classList.contains('ad-interrupting'))) {
             return true;
         }
-        if (document.querySelector('.ytp-ad-player-overlay, .ytp-ad-preview-container, .ytp-ad-text, .ytm-ad-overlay, .ad-showing, .ad-interrupting')) {
+        if (document.querySelector('.ytp-ad-player-overlay, .ytp-ad-preview-container, .ytp-ad-text, .ytm-ad-overlay, .ad-showing, .ad-interrupting, .video-ads.ytp-ad-module:not([style*="display: none"])')) {
             return true;
         }
         const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytm-ad-skip-button, button.ytp-ad-skip-button-slot');
@@ -423,6 +761,8 @@
 
     function handleVideoAds() {
         if (!adBlockEnabled) return;
+
+        dismissAntiAdblockModals();
 
         const video = document.querySelector('video');
         if (!video) return;
@@ -459,7 +799,7 @@
                 }
             }
 
-            // 3. Fast-forward the ad stream directly to the end
+            // 3. Fast-forward the SSAI ad stream directly to the end
             if (isFinite(video.duration) && video.duration > 0) {
                 video.currentTime = video.duration;
             }
@@ -490,6 +830,7 @@
         // SponsorBlock check
         if (!isAd) {
             checkSponsorBlock(video);
+            renderSeekbarSegments();
         }
     }
 
@@ -503,15 +844,22 @@
     document.addEventListener('play', (e) => {
         if (e.target && e.target.tagName === 'VIDEO') {
             handleVideoAds();
+            renderSeekbarSegments();
+            if (currentRydVotes) injectRydDom(currentRydVotes);
         }
     }, true);
 
-    // --- 7. REMOVE PROMOTIONS & YT MUSIC OPEN-APP BUTTONS ---
+    document.addEventListener('loadedmetadata', (e) => {
+        if (e.target && e.target.tagName === 'VIDEO') {
+            renderSeekbarSegments();
+        }
+    }, true);
+
+    // --- 8. REMOVE PROMOTIONS & YT MUSIC OPEN-APP BUTTONS ---
     function killYtMusicOpenAppButton() {
         const nav = document.querySelector('ytmusic-nav-bar');
         if (!nav) return;
 
-        // Only search strictly inside ytmusic-nav-bar and its shadowRoot
         const roots = [nav];
         if (nav.shadowRoot) roots.push(nav.shadowRoot);
 
@@ -538,6 +886,8 @@
     }
 
     function cleanDomElements() {
+        dismissAntiAdblockModals();
+
         const adSelectors = [
             'ytd-promoted-video-renderer',
             'ytd-promoted-sparkles-web-renderer',
@@ -571,9 +921,13 @@
         });
 
         killYtMusicOpenAppButton();
+
+        if (currentRydVotes) {
+            injectRydDom(currentRydVotes);
+        }
     }
 
-    // --- 8. MINIMAL FLOATING TOAST ---
+    // --- 9. MINIMAL FLOATING TOAST ---
     function showToast(message) {
         let toast = document.getElementById('puretube-toast');
         if (!toast) {
@@ -607,17 +961,18 @@
         }, 2200);
     }
 
-    // --- 9. URL MONITORING ---
+    // --- 10. URL MONITORING & VIDEO LIFECYCLE ---
     function checkUrlChange() {
         const newId = extractVideoId(window.location.href);
         if (newId && newId !== currentVideoId) {
             currentVideoId = newId;
             notifyFlutter('onVideoChanged', { videoId: newId, url: window.location.href });
             fetchSponsorBlockSegments(newId);
+            fetchRydData(newId);
         }
     }
 
-    // --- 10. JAVASCRIPT BRIDGE & CONTROL ---
+    // --- 11. JAVASCRIPT BRIDGE & CONTROL ---
     window.pureTubeControl = {
         seekBy: function(seconds) {
             const video = document.querySelector('video');
@@ -700,7 +1055,6 @@
                 return true;
             };
 
-            // 1. Try movie_player (Internal HTML5 Player API used by YouTube & YT Music)
             try {
                 const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.nextVideo === 'function') {
@@ -711,7 +1065,6 @@
                 console.warn('[PureTube] player.nextVideo error:', e);
             }
 
-            // 2. Try MediaSession handler with W3C action details
             if (typeof _mediaSessionHandlers['nexttrack'] === 'function') {
                 try {
                     console.log('[PureTube] Using mediaSessionHandler nexttrack');
@@ -721,7 +1074,6 @@
                 }
             }
 
-            // 3. Try clicking Next buttons across YouTube Music and YouTube
             const nextSelectors = [
                 'ytmusic-player-bar .next-button',
                 'ytmusic-player-bar [aria-label*="Next" i]',
@@ -757,13 +1109,11 @@
             for (const sel of nextSelectors) {
                 const btn = document.querySelector(sel);
                 if (btn && (btn.offsetParent !== null || btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-                    console.log('[PureTube] Clicked next button selector:', sel);
                     clicked = clickElement(btn);
                     break;
                 }
             }
 
-            // 4. If YouTube mobile watch page without playlist, click first Up Next recommendation
             if (!clicked) {
                 const upNext = document.querySelector(
                     'ytm-compact-video-renderer a.compact-media-item-image, ' +
@@ -773,15 +1123,12 @@
                     'a.compact-media-item-headline'
                 );
                 if (upNext) {
-                    console.log('[PureTube] Clicked up-next recommendation');
                     clicked = clickElement(upNext);
                 }
             }
 
-            // 5. Fallback: seek to video end and play to force autoplay transition
             const video = document.querySelector('video');
             if (video && isFinite(video.duration) && video.duration > 0) {
-                console.log('[PureTube] Seeking to end of video for autoplay next');
                 video.currentTime = Math.max(0, video.duration - 0.2);
                 try { video.play(); } catch(e) {}
             }
@@ -794,7 +1141,6 @@
 
             const video = document.querySelector('video');
             if (video && video.currentTime > 3.0) {
-                console.log('[PureTube] Seeking to start of video');
                 video.currentTime = 0;
                 setTimeout(syncMediaMetadata, 300);
                 return;
@@ -813,28 +1159,23 @@
                 return true;
             };
 
-            // 1. Try movie_player
             try {
                 const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
                 if (player && typeof player.previousVideo === 'function') {
-                    console.log('[PureTube] Using movie_player.previousVideo()');
                     player.previousVideo();
                 }
             } catch(e) {
                 console.warn('[PureTube] player.previousVideo error:', e);
             }
 
-            // 2. Try MediaSession handler with action details
             if (typeof _mediaSessionHandlers['previoustrack'] === 'function') {
                 try {
-                    console.log('[PureTube] Using mediaSessionHandler previoustrack');
                     _mediaSessionHandlers['previoustrack']({ action: 'previoustrack' });
                 } catch(e) {
                     console.warn('[PureTube] mediaSession previoustrack error:', e);
                 }
             }
 
-            // 3. Try clicking Prev buttons
             const prevSelectors = [
                 'ytmusic-player-bar .previous-button',
                 'ytmusic-player-bar [aria-label*="Previous" i]',
@@ -869,7 +1210,6 @@
             for (const sel of prevSelectors) {
                 const btn = document.querySelector(sel);
                 if (btn && (btn.offsetParent !== null || btn.offsetWidth > 0 || btn.offsetHeight > 0)) {
-                    console.log('[PureTube] Clicked prev button selector:', sel);
                     clicked = clickElement(btn);
                     break;
                 }
@@ -883,7 +1223,11 @@
         },
         setSponsorBlockEnabled: function(enabled) {
             sponsorBlockEnabled = enabled;
-            if (enabled && currentVideoId) fetchSponsorBlockSegments(currentVideoId);
+            if (enabled && currentVideoId) {
+                fetchSponsorBlockSegments(currentVideoId);
+            } else {
+                removeSeekbarSegments();
+            }
         },
         setAdBlockEnabled: function(enabled) {
             adBlockEnabled = enabled;
@@ -904,7 +1248,7 @@
         }
     };
 
-    // --- 11. MEDIA METADATA OBSERVER FOR SYSTEM NOTIFICATION ---
+    // --- 12. MEDIA METADATA OBSERVER FOR SYSTEM NOTIFICATION ---
     let lastSentMedia = { title: '', artist: '', artwork: '', isPlaying: false, position: -1, duration: -1 };
 
     function syncMediaMetadata() {
@@ -915,7 +1259,6 @@
         let artist = '';
         let artwork = '';
 
-        // 1. Prioritize navigator.mediaSession.metadata (most accurate and high-res on both YT and YT Music)
         if (window.navigator && window.navigator.mediaSession && window.navigator.mediaSession.metadata) {
             const m = window.navigator.mediaSession.metadata;
             if (m.title) title = m.title;
@@ -985,7 +1328,7 @@
     document.addEventListener('pause', syncMediaMetadata, true);
     document.addEventListener('seeked', syncMediaMetadata, true);
 
-    // --- 10. FULLSCREEN & ORIENTATION CONTROLLER ---
+    // --- 13. FULLSCREEN & ORIENTATION CONTROLLER ---
     function getVideoOrientation() {
         if (window.location.href.includes('/shorts/')) {
             return 'portrait';
@@ -1028,7 +1371,7 @@
         }
     }, true);
 
-    // --- 11. HIGH-PERFORMANCE DOM OBSERVER (ELIMINATES STUTTER) ---
+    // --- 14. HIGH-PERFORMANCE DOM OBSERVER & LIFECYCLE HEARTBEATS ---
     let cleanTimeout = null;
     function scheduleClean() {
         if (cleanTimeout) return;

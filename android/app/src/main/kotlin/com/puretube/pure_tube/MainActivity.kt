@@ -363,6 +363,7 @@ class MainActivity : FlutterActivity() {
 
     private var pipMethodChannel: MethodChannel? = null
     var mediaMethodChannel: MethodChannel? = null
+    private var audioDspPlugin: AudioDspPlugin? = null
     private var autoPipEnabled: Boolean = false
 
     var notificationManager: NotificationManager? = null
@@ -552,12 +553,17 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+
+        // 3. Audio DSP Channel
+        audioDspPlugin = AudioDspPlugin(this, flutterEngine.dartExecutor.binaryMessenger)
     }
 
     override fun onDestroy() {
         try {
             unregisterReceiver(mediaActionReceiver)
         } catch (e: Exception) {}
+        audioDspPlugin?.release()
+        audioDspPlugin = null
         ytSession.release()
         musicSession.release()
         super.onDestroy()

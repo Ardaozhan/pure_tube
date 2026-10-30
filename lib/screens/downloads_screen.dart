@@ -133,8 +133,12 @@ class DownloadsScreenState extends State<DownloadsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF222222),
-        title: const Text('Dosyayı Sil', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF121212),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.white12, width: 0.8),
+        ),
+        title: const Text('Dosyayı Sil', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: Text(
           'Bu dosyayı silmek istediğinizden emin misiniz?\n\n${item.name}',
           style: const TextStyle(color: Colors.white70),
@@ -182,7 +186,7 @@ class DownloadsScreenState extends State<DownloadsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: Colors.black, // Pure OLED pitch-black
       body: SafeArea(
         child: Column(
           children: [
@@ -190,8 +194,8 @@ class DownloadsScreenState extends State<DownloadsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(
-                color: Color(0xFF161616),
-                border: Border(bottom: BorderSide(color: Colors.white10, width: 1)),
+                color: Colors.black,
+                border: Border(bottom: BorderSide(color: Color(0x1FFFFFFF), width: 0.8)),
               ),
               child: Row(
                 children: [
@@ -255,7 +259,7 @@ class DownloadsScreenState extends State<DownloadsScreen> {
                         )
                       : RefreshIndicator(
                           color: Colors.redAccent,
-                          backgroundColor: const Color(0xFF222222),
+                          backgroundColor: const Color(0xFF141414),
                           onRefresh: refreshList,
                           child: ListView.builder(
                             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -266,9 +270,9 @@ class DownloadsScreenState extends State<DownloadsScreen> {
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 8),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF1A1A1A),
+                                  color: const Color(0xFF0D0D0D),
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                                 ),
                                 child: ListTile(
                                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),

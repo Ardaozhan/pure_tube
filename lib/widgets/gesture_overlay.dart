@@ -108,6 +108,39 @@ class _GestureOverlayState extends State<GestureOverlay> {
     }
   }
 
+  double _accumulatedSeekSeconds = 0.0;
+
+  void _handleHorizontalDragStart(DragStartDetails details) {
+    if (!widget.enabled) return;
+    _accumulatedSeekSeconds = 0.0;
+  }
+
+  void _handleHorizontalDragUpdate(DragUpdateDetails details, BoxConstraints constraints) {
+    if (!widget.enabled) return;
+    final screenWidth = constraints.maxWidth;
+    if (screenWidth <= 0) return;
+    final delta = details.primaryDelta ?? 0.0;
+    // Map horizontal movement across the screen to ~90 seconds of video seeking
+    final deltaSec = (delta / screenWidth) * 90.0;
+    _accumulatedSeekSeconds += deltaSec;
+
+    final rounded = _accumulatedSeekSeconds.round();
+    final sign = rounded > 0 ? '+' : '';
+    _showIndicator(
+      GestureIndicatorType.seek,
+      0.5,
+      '$sign$rounded sn',
+    );
+  }
+
+  void _handleHorizontalDragEnd(DragEndDetails details) {
+    if (!widget.enabled || widget.onSeek == null) return;
+    final rounded = _accumulatedSeekSeconds.round();
+    if (rounded.abs() >= 1) {
+      widget.onSeek!(rounded);
+    }
+  }
+
   void _handleDoubleTapDown(TapDownDetails details, BoxConstraints constraints) {
     if (!widget.enabled || widget.onSeek == null) return;
     final screenWidth = constraints.maxWidth;
@@ -136,14 +169,18 @@ class _GestureOverlayState extends State<GestureOverlay> {
         return Stack(
           children: [
             widget.child,
-            // Transparent gesture detection overlay on top of video
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onVerticalDragUpdate: (details) => _handleVerticalDragUpdate(details, constraints),
-                onDoubleTapDown: (details) => _handleDoubleTapDown(details, constraints),
+            // Transparent gesture detection overlay on top of video when enabled
+            if (widget.enabled)
+              Positioned.fill(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onVerticalDragUpdate: (details) => _handleVerticalDragUpdate(details, constraints),
+                  onHorizontalDragStart: _handleHorizontalDragStart,
+                  onHorizontalDragUpdate: (details) => _handleHorizontalDragUpdate(details, constraints),
+                  onHorizontalDragEnd: _handleHorizontalDragEnd,
+                  onDoubleTapDown: (details) => _handleDoubleTapDown(details, constraints),
+                ),
               ),
-            ),
             // Floating HUD Indicator
             if (_activeIndicator != null)
               Center(
@@ -153,7 +190,7 @@ class _GestureOverlayState extends State<GestureOverlay> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.75),
+                      color: Colors.black.withValues(alpha: 0.85),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: Colors.white24, width: 1),
                     ),
@@ -165,7 +202,7 @@ class _GestureOverlayState extends State<GestureOverlay> {
                               ? (_indicatorValue > 0.5 ? Icons.brightness_high : Icons.brightness_low)
                               : _activeIndicator == GestureIndicatorType.volume
                                   ? (_indicatorValue == 0 ? Icons.volume_off : Icons.volume_up)
-                                  : Icons.fast_forward,
+                                  : (_indicatorText.startsWith('-') ? Icons.fast_rewind : Icons.fast_forward),
                           color: Colors.white,
                           size: 38,
                         ),
