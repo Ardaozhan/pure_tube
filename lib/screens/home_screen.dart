@@ -36,9 +36,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Navigation tabs: 0: YouTube, 1: Müzik, 2: Kütüphane, 3: İndirilenler
+  // Navigation tabs: 0: YouTube, 1: Müzik
   int _currentTabIndex = 0;
-  final GlobalKey<DownloadsScreenState> _downloadsKey = GlobalKey<DownloadsScreenState>();
 
   InAppWebViewController? _ytController;
   InAppWebViewController? _ytMusicController;
@@ -402,6 +401,37 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openLibraryScreen() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => LibraryScreen(
+          onVideoTap: _handleLibraryVideoTap,
+          onChannelTap: _handleLibraryChannelTap,
+        ),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
+  void _openDownloadsScreen() {
+    Navigator.of(context).push(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const DownloadsScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
   DateTime? _lastBackPressTime;
 
   Future<void> _handleBackPress() async {
@@ -417,19 +447,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // 1. If on Library (2) or Downloads (3), go back to YouTube tab (0)
-    if (_currentTabIndex > 1) {
-      setState(() {
-        _currentTabIndex = 0;
-      });
-      PipService.setAutoPip(_autoPipEnabled);
-      return;
-    }
-
     // Active controller for current tab
     final controller = (_currentTabIndex == 1) ? _ytMusicController : _ytController;
     if (controller != null) {
-      // 2. If on YouTube Music and player drawer is expanded, collapse it first
+      // 1. If on YouTube Music and player drawer is expanded, collapse it first
       if (_currentTabIndex == 1) {
         try {
           final minimized = await controller.evaluateJavascript(
@@ -460,7 +481,7 @@ class _HomeScreenState extends State<HomeScreen> {
         } catch (_) {}
       }
 
-      // 3. Standard web history navigation
+      // 2. Standard web history navigation
       if (await controller.canGoBack()) {
         await controller.goBack();
         return;
@@ -503,7 +524,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final isYouTube = _currentTabIndex == 0;
     final isMusic = _currentTabIndex == 1;
-    final showTopBar = !_isFullscreen && !_isInPip && (isYouTube || isMusic);
 
     return PopScope(
       canPop: false,
@@ -514,41 +534,138 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.black, // Pure OLED pitch-black (#000000)
-        appBar: showTopBar
-            ? PreferredSize(
+        appBar: (_isFullscreen || _isInPip)
+            ? null
+            : PreferredSize(
                 preferredSize: Size.fromHeight(_isLoading ? 52 : 50),
                 child: AppBar(
-                  backgroundColor: Colors.black, // OLED pitch black (#000000)
+                  backgroundColor: const Color(0xFF0F0F0F),
                   elevation: 0,
                   scrolledUnderElevation: 0,
                   automaticallyImplyLeading: false,
-                  titleSpacing: 16,
-                  title: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isMusic ? Icons.music_note_rounded : Icons.play_arrow_rounded,
-                        color: isMusic ? const Color(0xFFFF2D55) : Colors.redAccent,
-                        size: 26,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isMusic ? 'PureMusic' : 'PureTube',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 19,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.5,
+                  titleSpacing: 10,
+                  title: Container(
+                    height: 38,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white12, width: 0.8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // YouTube Pill
+                        GestureDetector(
+                          onTap: () {
+                            if (_currentTabIndex != 0) {
+                              _ytMusicController?.evaluateJavascript(
+                                source: 'if (window.pureTubeControl) window.pureTubeControl.pause();',
+                              );
+                              setState(() {
+                                _currentTabIndex = 0;
+                              });
+                              PipService.setAutoPip(_autoPipEnabled);
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isYouTube ? Colors.redAccent : Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: isYouTube
+                                  ? [
+                                      BoxShadow(
+                                        color: Colors.redAccent.withValues(alpha: 0.4),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.play_arrow_rounded,
+                                  size: 18,
+                                  color: isYouTube ? Colors.white : Colors.white60,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'YouTube',
+                                  style: TextStyle(
+                                    color: isYouTube ? Colors.white : Colors.white60,
+                                    fontSize: 12.5,
+                                    fontWeight: isYouTube ? FontWeight.bold : FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        // Music Pill
+                        GestureDetector(
+                          onTap: () {
+                            if (_currentTabIndex != 1) {
+                              _ytController?.evaluateJavascript(
+                                source: 'if (window.pureTubeControl) window.pureTubeControl.pause();',
+                              );
+                              setState(() {
+                                _currentTabIndex = 1;
+                              });
+                              PipService.setAutoPip(false);
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isMusic ? const Color(0xFFFF2D55) : Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: isMusic
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFFFF2D55).withValues(alpha: 0.4),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.music_note_rounded,
+                                  size: 16,
+                                  color: isMusic ? Colors.white : Colors.white60,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Müzik',
+                                  style: TextStyle(
+                                    color: isMusic ? Colors.white : Colors.white60,
+                                    fontSize: 12.5,
+                                    fontWeight: isMusic ? FontWeight.bold : FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   actions: [
                     // Ad Shield Counter
                     GestureDetector(
                       onTap: _openSettingsDialog,
                       child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 11),
+                        margin: const EdgeInsets.symmetric(vertical: 10),
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: Colors.green.withValues(alpha: 0.16),
@@ -572,16 +689,36 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 2),
+                    const SizedBox(width: 1),
 
                     // "İndir" button
                     IconButton(
                       tooltip: 'İndir',
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                      icon: const Icon(Icons.download_rounded, color: Colors.white, size: 21),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.download_rounded, color: Colors.white, size: 20),
                       onPressed: _openDownloadModal,
+                    ),
+
+                    // "Kütüphane" button
+                    IconButton(
+                      tooltip: 'Kütüphane',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.video_library_rounded, color: Colors.white, size: 19),
+                      onPressed: _openLibraryScreen,
+                    ),
+
+                    // "İndirilenler" button
+                    IconButton(
+                      tooltip: 'İndirilenler',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.download_done_rounded, color: Colors.white70, size: 19),
+                      onPressed: _openDownloadsScreen,
                     ),
 
                     // "Ekolayzer" button
@@ -589,8 +726,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       tooltip: 'Ekolayzer',
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                      icon: const Icon(Icons.tune_rounded, color: Color(0xFFFFD700), size: 20),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.tune_rounded, color: Color(0xFFFFD700), size: 19),
                       onPressed: () => EqualizerSheet.show(context),
                     ),
 
@@ -600,8 +737,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         tooltip: 'Şarkı Sözleri',
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                        icon: const Icon(Icons.lyrics_rounded, color: Color(0xFF64B5F6), size: 20),
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        icon: const Icon(Icons.lyrics_rounded, color: Color(0xFF64B5F6), size: 19),
                         onPressed: _openLyricsSheet,
                       ),
 
@@ -611,8 +748,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         tooltip: 'Küçük Pencere (PiP)',
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                        icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 20),
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        icon: const Icon(Icons.picture_in_picture_alt_rounded, color: Colors.white, size: 19),
                         onPressed: () {
                           PipService.enterPip();
                           _ytController?.evaluateJavascript(
@@ -628,11 +765,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       tooltip: 'Ayarlar',
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-                      icon: const Icon(Icons.settings_rounded, color: Colors.white70, size: 20),
+                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      icon: const Icon(Icons.settings_rounded, color: Colors.white70, size: 19),
                       onPressed: _openSettingsDialog,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                   ],
                   bottom: _isLoading
                       ? PreferredSize(
@@ -648,8 +785,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         )
                       : null,
                 ),
-              )
-            : null,
+              ),
         body: SafeArea(
           top: false,
           bottom: !_isFullscreen && !_isInPip,
@@ -666,80 +802,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 onCreated: (controller) => _ytMusicController = controller,
                 isYouTube: false,
               ),
-              LibraryScreen(
-                onVideoTap: _handleLibraryVideoTap,
-                onChannelTap: _handleLibraryChannelTap,
-              ),
-              DownloadsScreen(
-                key: _downloadsKey,
-              ),
             ],
           ),
         ),
-        bottomNavigationBar: (_isFullscreen || _isInPip)
-            ? null
-            : Theme(
-                data: Theme.of(context).copyWith(
-                  canvasColor: Colors.black,
-                  splashColor: Colors.transparent,
-                  highlightColor: Colors.transparent,
-                ),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.black,
-                    border: Border(
-                      top: BorderSide(color: Color(0x1FFFFFFF), width: 0.8),
-                    ),
-                  ),
-                  child: BottomNavigationBar(
-                    currentIndex: _currentTabIndex,
-                    onTap: (index) {
-                      if (_currentTabIndex == index) return;
-                      // Refresh downloads list when opening tab 3
-                      if (index == 3) {
-                        _downloadsKey.currentState?.refreshList();
-                      }
-                      setState(() {
-                        _currentTabIndex = index;
-                      });
-                      if (index == 0) {
-                        PipService.setAutoPip(_autoPipEnabled);
-                      } else {
-                        PipService.setAutoPip(false);
-                      }
-                    },
-                    backgroundColor: Colors.black,
-                    elevation: 0,
-                    type: BottomNavigationBarType.fixed,
-                    selectedItemColor: _currentTabIndex == 1 ? const Color(0xFFFF2D55) : Colors.redAccent,
-                    unselectedItemColor: Colors.white54,
-                    selectedFontSize: 11,
-                    unselectedFontSize: 11,
-                    items: const [
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.play_circle_outline_rounded),
-                        activeIcon: Icon(Icons.play_circle_filled_rounded),
-                        label: 'YouTube',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.music_note_outlined),
-                        activeIcon: Icon(Icons.music_note_rounded),
-                        label: 'Müzik',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.video_library_outlined),
-                        activeIcon: Icon(Icons.video_library_rounded),
-                        label: 'Kütüphane',
-                      ),
-                      BottomNavigationBarItem(
-                        icon: Icon(Icons.download_rounded),
-                        activeIcon: Icon(Icons.download_done_rounded),
-                        label: 'İndirilenler',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
       ),
     );
   }
@@ -862,15 +927,19 @@ class _HomeScreenState extends State<HomeScreen> {
               final positionMs = (map['positionMs'] as num?)?.toInt() ?? 0;
               final durationMs = (map['durationMs'] as num?)?.toInt() ?? 0;
 
-              if (mounted) {
-                setState(() {
-                  if (title.isNotEmpty) _currentTitle = title;
-                  if (artist.isNotEmpty) _currentArtist = artist;
-                  if (artwork != null && artwork.isNotEmpty) _currentArtwork = artwork;
-                  _isPlaying = isPlaying;
-                  _currentPositionMs = positionMs;
-                  _currentDurationMs = durationMs;
-                });
+              final metadataChanged = (title.isNotEmpty && title != _currentTitle) ||
+                  (artist.isNotEmpty && artist != _currentArtist) ||
+                  (isPlaying != _isPlaying);
+
+              if (title.isNotEmpty) _currentTitle = title;
+              if (artist.isNotEmpty) _currentArtist = artist;
+              if (artwork != null && artwork.isNotEmpty) _currentArtwork = artwork;
+              _isPlaying = isPlaying;
+              _currentPositionMs = positionMs;
+              _currentDurationMs = durationMs;
+
+              if (mounted && metadataChanged) {
+                setState(() {});
               }
 
               MediaNotificationService.updateMetadata(
@@ -882,17 +951,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 positionMs: positionMs,
                 durationMs: durationMs,
               );
-
-              if (_currentVideoId != null && _currentVideoId!.isNotEmpty) {
-                _recordWatchHistory(
-                  videoId: _currentVideoId!,
-                  title: title.isNotEmpty ? title : null,
-                  author: artist.isNotEmpty ? artist : null,
-                  thumbnailUrl: artwork,
-                  positionMs: positionMs,
-                  durationMs: durationMs,
-                );
-              }
             }
           },
         );

@@ -187,52 +187,42 @@ class DownloadsScreenState extends State<DownloadsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black, // Pure OLED pitch-black
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header Stats Bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                border: Border(bottom: BorderSide(color: Color(0x1FFFFFFF), width: 0.8)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.download_done_rounded, color: Colors.redAccent, size: 24),
-                  const SizedBox(width: 10),
-                  Text(
-                    'İndirilenler (${_items.length})',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (_items.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _formattedTotalSize,
-                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 22),
-                    onPressed: refreshList,
-                  ),
-                ],
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Text(
+          'İndirilenler (${_items.length})',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        actions: [
+          if (_items.isNotEmpty)
+            Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _formattedTotalSize,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
               ),
             ),
-
-            // Content List
-            Expanded(
-              child: _isLoading
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 22),
+            onPressed: refreshList,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: _isLoading
                   ? const Center(child: CircularProgressIndicator(color: Colors.redAccent))
                   : _items.isEmpty
                       ? Center(
@@ -352,9 +342,6 @@ class DownloadsScreenState extends State<DownloadsScreen> {
                             },
                           ),
                         ),
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -448,9 +448,11 @@
         if (old) old.remove();
     }
 
+    let lastRenderedSbKey = '';
     function renderSeekbarSegments() {
         if (!sponsorBlockEnabled || sponsorSegments.length === 0) {
             removeSeekbarSegments();
+            lastRenderedSbKey = '';
             return;
         }
 
@@ -459,7 +461,13 @@
         if (!track || !video || !isFinite(video.duration) || video.duration <= 0) return;
 
         const duration = video.duration;
+        const currentKey = `${currentVideoId}_${duration.toFixed(0)}_${sponsorSegments.length}`;
         let container = document.getElementById('puretube-sb-segments');
+        if (container && lastRenderedSbKey === currentKey && container.parentElement === track) {
+            return; // Already cleanly rendered, do not thrash DOM
+        }
+        lastRenderedSbKey = currentKey;
+
         if (!container) {
             container = document.createElement('div');
             container.id = 'puretube-sb-segments';
@@ -679,6 +687,9 @@
         );
     }
 
+    let rydRetryTimer = null;
+    let rydRetryCount = 0;
+
     function injectRydDom(votes) {
         if (!votes) return;
 
@@ -719,6 +730,17 @@
             if (likesEl) likesEl.style.width = likePct + '%';
             if (dislikesEl) dislikesEl.style.width = dislikePct + '%';
             rydBar.setAttribute('title', `${votes.formattedLikes || votes.likes} beğeni / ${votes.formattedDislikes || votes.dislikes} beğenmeme (%${likePct.toFixed(1)})`);
+        }
+
+        // Auto-retry a few times if DOM elements weren't yet rendered by YouTube SPA
+        if ((!dislikeBtn || !actionBar) && rydRetryCount < 6) {
+            rydRetryCount++;
+            clearTimeout(rydRetryTimer);
+            rydRetryTimer = setTimeout(() => {
+                if (currentRydVotes) injectRydDom(currentRydVotes);
+            }, 500);
+        } else {
+            rydRetryCount = 0;
         }
     }
 
@@ -827,19 +849,20 @@
         const closeButtons = document.querySelectorAll('.ytp-ad-overlay-close-button, .ytp-ad-image-overlay-close-btn');
         closeButtons.forEach(btn => btn.click());
 
-        // SponsorBlock check
+        // SponsorBlock check (fast numeric comparison, zero DOM operations)
         if (!isAd) {
             checkSponsorBlock(video);
-            renderSeekbarSegments();
         }
     }
 
-    // Attach immediate event hooks on video elements
+    // Attach lightweight event hooks on video elements
     document.addEventListener('timeupdate', (e) => {
         if (e.target && e.target.tagName === 'VIDEO') {
-            handleVideoAds();
+            if (sponsorBlockEnabled && sponsorSegments.length > 0) {
+                checkSponsorBlock(e.target);
+            }
         }
-    }, true);
+    }, { capture: true, passive: true });
 
     document.addEventListener('play', (e) => {
         if (e.target && e.target.tagName === 'VIDEO') {
