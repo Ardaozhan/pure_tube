@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/adblock_filter.dart';
 import '../services/pip_service.dart';
 import '../services/media_notification_service.dart';
+import '../services/audio_dsp_service.dart';
 import '../services/update_service.dart';
 import '../services/ryd_service.dart';
 import '../services/sponsorblock_service.dart';
@@ -50,11 +51,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentPositionMs = 0;
   int _currentDurationMs = 0;
 
-  int _blockedCount = 0;
+  final ValueNotifier<int> _blockedCountNotifier = ValueNotifier<int>(0);
   bool _isInPip = false;
   bool _isFullscreen = false;
   bool _adBlockEnabled = true;
   bool _sponsorBlockEnabled = true;
+  bool _rydEnabled = true;
   bool _autoPipEnabled = true;
   double _loadProgress = 0.0;
   bool _isLoading = true;
@@ -113,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadSettings();
     _setupPipListener();
     _setupMediaNotificationListener();
+    AudioDspService().init();
     UpdateService.checkOnStartup(context);
   }
 
@@ -164,31 +167,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     final adBlock = prefs.getBool('adBlockEnabled') ?? true;
     final sponsor = prefs.getBool('sponsorBlockEnabled') ?? true;
+    final ryd = prefs.getBool('rydEnabled') ?? true;
     final autoPip = prefs.getBool('autoPipEnabled') ?? true;
     final savedBlockedCount = prefs.getInt('totalBlockedCount') ?? 0;
 
     _autoPipEnabled = autoPip;
     await PipService.setAutoPip(_currentTabIndex == 0 ? autoPip : false);
+    _blockedCountNotifier.value = savedBlockedCount;
 
     if (mounted) {
       setState(() {
         _adBlockEnabled = adBlock;
         _sponsorBlockEnabled = sponsor;
-        _blockedCount = savedBlockedCount;
+        _rydEnabled = ryd;
       });
     }
   }
 
   void _incrementBlockedCount() {
     if (!_adBlockEnabled) return;
-    _blockedCount++;
-    if (mounted) {
-      setState(() {});
-    }
+    _blockedCountNotifier.value++;
     _saveCounterTimer?.cancel();
     _saveCounterTimer = Timer(const Duration(milliseconds: 1500), () async {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('totalBlockedCount', _blockedCount);
+      await prefs.setInt('totalBlockedCount', _blockedCountNotifier.value);
     });
   }
 
@@ -212,31 +214,30 @@ class _HomeScreenState extends State<HomeScreen> {
     await showDialog(
       context: context,
       builder: (_) => SettingsDialog(
-        totalBlockedCount: _blockedCount,
+        totalBlockedCount: _blockedCountNotifier.value,
         onResetCounter: () async {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt('totalBlockedCount', 0);
-          if (mounted) {
-            setState(() {
-              _blockedCount = 0;
-            });
-          }
+          _blockedCountNotifier.value = 0;
         },
-        onChanged: (adBlock, sponsorBlock) {
+        onChanged: (adBlock, sponsorBlock, ryd) {
           setState(() {
             _adBlockEnabled = adBlock;
             _sponsorBlockEnabled = sponsorBlock;
+            _rydEnabled = ryd;
           });
           _ytController?.evaluateJavascript(
             source: 'if(window.pureTubeControl) { '
                 'window.pureTubeControl.setAdBlockEnabled($adBlock); '
                 'window.pureTubeControl.setSponsorBlockEnabled($sponsorBlock); '
+                'if (window.pureTubeControl.setRydEnabled) window.pureTubeControl.setRydEnabled($ryd); '
                 '}',
           );
           _ytMusicController?.evaluateJavascript(
             source: 'if(window.pureTubeControl) { '
                 'window.pureTubeControl.setAdBlockEnabled($adBlock); '
                 'window.pureTubeControl.setSponsorBlockEnabled($sponsorBlock); '
+                'if (window.pureTubeControl.setRydEnabled) window.pureTubeControl.setRydEnabled($ryd); '
                 '}',
           );
         },
@@ -338,6 +339,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  DateTime? _lastHistoryRecordTime;
+  String? _lastRecordedVideoId;
+  int? _lastRecordedPositionMs;
+
+  void _updateWatchProgress(String videoId, int positionMs, int durationMs) {
+    final now = DateTime.now();
+    final timeSinceLast = _lastHistoryRecordTime == null
+        ? 10000
+        : now.difference(_lastHistoryRecordTime!).inMilliseconds;
+    final posDiff = ((_lastRecordedPositionMs ?? 0) - positionMs).abs();
+
+    if (videoId != _lastRecordedVideoId || (timeSinceLast >= 5000 && posDiff >= 3000)) {
+      _lastHistoryRecordTime = now;
+      _lastRecordedVideoId = videoId;
+      _lastRecordedPositionMs = positionMs;
+      _recordWatchHistory(
+        videoId: videoId,
+        positionMs: positionMs,
+        durationMs: durationMs,
+      );
+    }
+  }
+
   Future<void> _recordWatchHistory({
     required String videoId,
     String? title,
@@ -363,8 +387,8 @@ class _HomeScreenState extends State<HomeScreen> {
         title: cleanTitle,
         author: author ?? (_currentArtist.isNotEmpty ? _currentArtist : null),
         thumbnailUrl: thumb,
-        positionMs: positionMs,
-        durationMs: durationMs,
+        positionMs: positionMs ?? _currentPositionMs,
+        durationMs: durationMs ?? _currentDurationMs,
       );
     } catch (e) {
       debugPrint('[PureTube] Error recording history: $e');
@@ -514,7 +538,25 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     MediaNotificationService.clear();
-    _saveCounterTimer?.cancel();
+    MediaNotificationService.onAction = null;
+    PipService.onPipModeChanged = null;
+    if (_saveCounterTimer?.isActive == true) {
+      _saveCounterTimer?.cancel();
+      final finalCount = _blockedCountNotifier.value;
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.setInt('totalBlockedCount', finalCount);
+      });
+    } else {
+      _saveCounterTimer?.cancel();
+    }
+    if (_currentVideoId != null && _currentPositionMs > 0) {
+      _recordWatchHistory(
+        videoId: _currentVideoId!,
+        positionMs: _currentPositionMs,
+        durationMs: _currentDurationMs,
+      );
+    }
+    _blockedCountNotifier.dispose();
     SystemChrome.setPreferredOrientations([]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -677,12 +719,15 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: [
                             const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 14),
                             const SizedBox(width: 4),
-                            Text(
-                              '$_blockedCount',
-                              style: const TextStyle(
-                                color: Colors.greenAccent,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
+                            ValueListenableBuilder<int>(
+                              valueListenable: _blockedCountNotifier,
+                              builder: (context, count, _) => Text(
+                                '$count',
+                                style: const TextStyle(
+                                  color: Colors.greenAccent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
                           ],
@@ -870,6 +915,11 @@ class _HomeScreenState extends State<HomeScreen> {
               final title = map['title'] as String?;
               final author = map['author'] as String?;
               if (mounted && videoId != null) {
+                _currentPositionMs = 0;
+                _currentDurationMs = 0;
+                _lastRecordedVideoId = videoId;
+                _lastRecordedPositionMs = 0;
+                _lastHistoryRecordTime = DateTime.now();
                 setState(() => _currentVideoId = videoId);
                 // Prefetch RYD votes and SponsorBlock segments asynchronously
                 RydService.instance.fetchVotes(videoId);
@@ -878,6 +928,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   videoId: videoId,
                   title: title,
                   author: author,
+                  positionMs: 0,
+                  durationMs: 0,
                 );
               }
             }
@@ -951,6 +1003,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 positionMs: positionMs,
                 durationMs: durationMs,
               );
+
+              if (_currentVideoId != null && positionMs > 0) {
+                _updateWatchProgress(_currentVideoId!, positionMs, durationMs);
+              }
             }
           },
         );
@@ -1031,6 +1087,7 @@ class _HomeScreenState extends State<HomeScreen> {
           source: 'if(window.pureTubeControl) { '
               'window.pureTubeControl.setAdBlockEnabled($_adBlockEnabled); '
               'window.pureTubeControl.setSponsorBlockEnabled($_sponsorBlockEnabled); '
+              'if(window.pureTubeControl.setRydEnabled) window.pureTubeControl.setRydEnabled($_rydEnabled); '
               '}',
         );
 

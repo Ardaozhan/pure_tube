@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -8,12 +9,31 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._();
 
   static Database? _database;
+  static Completer<Database>? _initCompleter;
 
   /// Returns the singleton database instance, initializing it if necessary.
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+    if (_database != null && _database!.isOpen) return _database!;
+    _database = null;
+
+    if (_initCompleter != null) {
+      return _initCompleter!.future;
+    }
+
+    final completer = Completer<Database>();
+    _initCompleter = completer;
+
+    try {
+      _database = await _initDatabase();
+      completer.complete(_database!);
+      return _database!;
+    } catch (e, st) {
+      _initCompleter = null;
+      completer.completeError(e, st);
+      rethrow;
+    } finally {
+      _initCompleter = null;
+    }
   }
 
   Future<Database> _initDatabase() async {
@@ -96,5 +116,6 @@ class AppDatabase {
       await db.close();
       _database = null;
     }
+    _initCompleter = null;
   }
 }

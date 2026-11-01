@@ -283,29 +283,6 @@
         }, true);
 
         if (window.HTMLMediaElement && window.HTMLMediaElement.prototype) {
-            const originalMediaPause = HTMLMediaElement.prototype.pause;
-            HTMLMediaElement.prototype.pause = function(...args) {
-                if (isUserPaused) {
-                    return originalMediaPause.apply(this, args);
-                }
-                console.log('[PureTube] Intercepted & prevented unwanted background pause on ' + this.tagName);
-                return Promise.resolve();
-            };
-
-            const handleMediaPauseEvent = (e) => {
-                const el = e.target;
-                if (el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO')) {
-                    if (isUserPaused) return;
-                    setTimeout(() => {
-                        if (!isUserPaused) {
-                            try { el.play(); } catch(_) {}
-                        }
-                    }, 20);
-                }
-            };
-            document.addEventListener('pause', handleMediaPauseEvent, true);
-            window.addEventListener('pause', handleMediaPauseEvent, true);
-
             const handleMediaPlayEvent = (e) => {
                 const el = e.target;
                 if (el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO')) {
@@ -316,13 +293,15 @@
             document.addEventListener('play', handleMediaPlayEvent, true);
             window.addEventListener('play', handleMediaPlayEvent, true);
 
-            setInterval(() => {
-                const media = document.querySelector('video') || document.querySelector('audio');
-                if (media && media.paused && !isUserPaused && media.currentTime > 0 && media.currentTime < (media.duration - 0.5)) {
-                    console.log('[PureTube Watchdog] Waking up stalled media element in background');
-                    try { media.play(); } catch(_) {}
+            const handleMediaPauseEvent = (e) => {
+                const el = e.target;
+                if (el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO')) {
+                    isUserPaused = true;
                 }
-            }, 1500);
+                syncMediaMetadata();
+            };
+            document.addEventListener('pause', handleMediaPauseEvent, true);
+            window.addEventListener('pause', handleMediaPauseEvent, true);
         }
 
         if ('wakeLock' in navigator) {
@@ -349,9 +328,12 @@
     let sponsorSegments = [];
     let sponsorBlockEnabled = true;
     let adBlockEnabled = true;
+    let rydEnabled = true;
     let blockedAdsCount = 0;
     let adWasPlaying = false;
     let lastSkippedSegment = null;
+    let skipCooldownUntil = 0;
+    const exemptedSegments = new Set();
 
     // RYD (Return YouTube Dislike) State
     let currentRydVotes = null;
@@ -570,9 +552,16 @@
         const undoBtn = badge.querySelector('.puretube-badge-undo');
         if (undoBtn) {
             undoBtn.onclick = (e) => {
+                e.preventDefault();
                 e.stopPropagation();
+                skipCooldownUntil = Date.now() + 3000;
                 const video = document.querySelector('video');
                 if (video && lastSkippedSegment) {
+                    const seg = lastSkippedSegment.segment;
+                    const segKey = (seg && (seg.uuid || `${seg.start}_${seg.end}`)) || '';
+                    if (segKey) {
+                        exemptedSegments.add(segKey);
+                    }
                     video.currentTime = Math.max(0, lastSkippedSegment.from - 0.5);
                     showToast('Geri alındı');
                 }
@@ -589,9 +578,12 @@
 
     function checkSponsorBlock(video) {
         if (!sponsorBlockEnabled || sponsorSegments.length === 0 || !video) return;
+        if (Date.now() < skipCooldownUntil) return;
         const cur = video.currentTime;
         for (let i = 0; i < sponsorSegments.length; i++) {
             const seg = sponsorSegments[i];
+            const segKey = seg.uuid || `${seg.start}_${seg.end}`;
+            if (exemptedSegments.has(segKey)) continue;
             if (cur >= seg.start && cur < (seg.end - 0.25)) {
                 const from = cur;
                 video.currentTime = seg.end;
@@ -602,8 +594,15 @@
     }
 
     // --- 6. RETURN YOUTUBE DISLIKE (RYD) DOM INJECTOR ---
+    function removeRydDom() {
+        const counts = document.querySelectorAll('.puretube-ryd-count');
+        counts.forEach(el => el.remove());
+        const bar = document.getElementById('puretube-ryd-bar');
+        if (bar) bar.remove();
+    }
+
     async function fetchRydData(videoId) {
-        if (!videoId || rydFetchInProgress) return;
+        if (!videoId || !rydEnabled || rydFetchInProgress) return;
         if (lastRydVideoId === videoId && currentRydVotes) {
             injectRydDom(currentRydVotes);
             return;
@@ -691,7 +690,7 @@
     let rydRetryCount = 0;
 
     function injectRydDom(votes) {
-        if (!votes) return;
+        if (!votes || !rydEnabled) return;
 
         // 1. Insert/update dislike count on dislike button in YouTube mobile DOM
         const dislikeBtn = findDislikeButton();
@@ -793,9 +792,11 @@
         const isAd = isAdPlayingNow();
 
         if (isAd) {
+            if (!adWasPlaying) {
+                blockedAdsCount++;
+                notifyFlutter('onAdBlocked', { count: 1 });
+            }
             adWasPlaying = true;
-            blockedAdsCount++;
-            notifyFlutter('onAdBlocked', { count: blockedAdsCount });
 
             // 1. Mute ad immediately so no sound leaks
             video.muted = true;
@@ -821,10 +822,7 @@
                 }
             }
 
-            // 3. Fast-forward the SSAI ad stream directly to the end
-            if (isFinite(video.duration) && video.duration > 0) {
-                video.currentTime = video.duration;
-            }
+            // 3. Fast-forward the ad playback rate without skipping the whole video
             video.playbackRate = 16.0;
 
             // 4. Call native player skipAd / cancelPlayback if exposed
@@ -989,6 +987,8 @@
         const newId = extractVideoId(window.location.href);
         if (newId && newId !== currentVideoId) {
             currentVideoId = newId;
+            exemptedSegments.clear();
+            skipCooldownUntil = 0;
             notifyFlutter('onVideoChanged', { videoId: newId, url: window.location.href });
             fetchSponsorBlockSegments(newId);
             fetchRydData(newId);
@@ -1016,40 +1016,34 @@
         play: function() {
             window.__pureTubeMarkInteraction();
             console.log('[PureTube] pureTubeControl.play() called');
-            const video = document.querySelector('video');
-            if (video && video.paused) {
-                try { video.play(); } catch(e) {}
+            const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+            if (player && typeof player.playVideo === 'function') {
+                try { player.playVideo(); } catch(e) {}
+            } else {
+                const video = document.querySelector('video');
+                if (video && video.paused) {
+                    try { video.play(); } catch(e) {}
+                }
             }
             if (typeof _mediaSessionHandlers['play'] === 'function') {
                 try { _mediaSessionHandlers['play']({ action: 'play' }); } catch(e) {}
-            }
-            const ytMusicPlay = document.querySelector('ytmusic-player-bar #play-pause-button[aria-label*="Play" i], ytmusic-player-bar #play-pause-button[aria-label*="Oynat" i], ytmusic-player-bar .play-pause-button');
-            if (ytMusicPlay && video && video.paused) {
-                try { ytMusicPlay.click(); } catch(e) {}
-            }
-            const ytPlay = document.querySelector('.player-control-play-pause-icon, .ytp-play-button, button[aria-label*="Play" i], button[aria-label*="Oynat" i]');
-            if (ytPlay && video && video.paused) {
-                try { ytPlay.click(); } catch(e) {}
             }
             syncMediaMetadata();
         },
         pause: function() {
             window.__pureTubeAllowPause();
             console.log('[PureTube] pureTubeControl.pause() called');
-            const video = document.querySelector('video');
-            if (video && !video.paused) {
-                try { video.pause(); } catch(e) {}
+            const player = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+            if (player && typeof player.pauseVideo === 'function') {
+                try { player.pauseVideo(); } catch(e) {}
+            } else {
+                const video = document.querySelector('video');
+                if (video && !video.paused) {
+                    try { video.pause(); } catch(e) {}
+                }
             }
             if (typeof _mediaSessionHandlers['pause'] === 'function') {
                 try { _mediaSessionHandlers['pause']({ action: 'pause' }); } catch(e) {}
-            }
-            const ytMusicPause = document.querySelector('ytmusic-player-bar #play-pause-button[aria-label*="Pause" i], ytmusic-player-bar #play-pause-button[aria-label*="Duraklat" i], ytmusic-player-bar #play-pause-button[aria-label*="Durdur" i]');
-            if (ytMusicPause && video && !video.paused) {
-                try { ytMusicPause.click(); } catch(e) {}
-            }
-            const ytPause = document.querySelector('.player-control-play-pause-icon, .ytp-play-button, button[aria-label*="Pause" i], button[aria-label*="Duraklat" i], button[aria-label*="Durdur" i]');
-            if (ytPause && video && !video.paused) {
-                try { ytPause.click(); } catch(e) {}
             }
             syncMediaMetadata();
         },
@@ -1150,12 +1144,6 @@
                 }
             }
 
-            const video = document.querySelector('video');
-            if (video && isFinite(video.duration) && video.duration > 0) {
-                video.currentTime = Math.max(0, video.duration - 0.2);
-                try { video.play(); } catch(e) {}
-            }
-
             setTimeout(syncMediaMetadata, 500);
         },
         prevTrack: function() {
@@ -1254,6 +1242,14 @@
         },
         setAdBlockEnabled: function(enabled) {
             adBlockEnabled = enabled;
+        },
+        setRydEnabled: function(enabled) {
+            rydEnabled = enabled;
+            if (!enabled) {
+                removeRydDom();
+            } else if (currentVideoId) {
+                fetchRydData(currentVideoId);
+            }
         },
         setPipMode: function(enabled) {
             if (enabled) {

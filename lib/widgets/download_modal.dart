@@ -60,9 +60,12 @@ class _DownloadModalState extends State<DownloadModal> {
 
     if (mounted) {
       if (file != null) {
+        final filename = file.uri.pathSegments.isNotEmpty
+            ? file.uri.pathSegments.last
+            : file.path.split(RegExp(r'[/\\]')).last;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Dosya Downloads/PureTube klasörüne kaydedildi: ${file.path.split('/').last}'),
+            content: Text('Dosya kaydedildi: $filename'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 4),
           ),
@@ -72,6 +75,13 @@ class _DownloadModalState extends State<DownloadModal> {
         setState(() {
           _isDownloading = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('İndirme başarısız oldu. Lütfen internet bağlantınızı ve depolama izinlerinizi kontrol edin.'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
     }
   }

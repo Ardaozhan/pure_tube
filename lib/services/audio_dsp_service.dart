@@ -34,6 +34,7 @@ class AudioDspService extends ChangeNotifier {
   static const String _prefLoudnessKey = 'dsp_loudness_gain_mb';
   static const String _prefBandPrefix = 'dsp_band_level_';
 
+  Completer<void>? _initCompleter;
   bool _isInitialized = false;
   bool _isSupported = false;
   bool _isEnabled = false;
@@ -80,6 +81,10 @@ class AudioDspService extends ChangeNotifier {
   /// Initialize DSP engine, read hardware capabilities, and restore saved state.
   Future<void> init() async {
     if (_isInitialized) return;
+    if (_initCompleter != null) return _initCompleter!.future;
+
+    final completer = Completer<void>();
+    _initCompleter = completer;
 
     try {
       final res = await _channel.invokeMapMethod<String, dynamic>('initDsp');
@@ -118,6 +123,8 @@ class AudioDspService extends ChangeNotifier {
     // Restore from SharedPreferences
     await _restoreSettings();
     _isInitialized = true;
+    completer.complete();
+    _initCompleter = null;
     notifyListeners();
   }
 

@@ -46,6 +46,9 @@ class LyricsService {
   /// Pre-compiled regex for parsing LRC timestamps like [01:23.45] or [01:23.456]
   static final RegExp _timestampRegex = RegExp(r'\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]');
 
+  /// Pre-compiled regex for LRC non-timestamp metadata tags like [length:...], [ar:...], [ti:...]
+  static final RegExp _metadataTagRegex = RegExp(r'\[[a-zA-Z]+:[^\]]*\]');
+
   /// Fetches synchronized lyrics for the given song.
   ///
   /// Checks the memory cache first. If not found, attempts an exact match
@@ -181,7 +184,8 @@ class LyricsService {
   }
 
   /// Parses an LRC string format into a sorted list of [LyricLine]s.
-  /// Handles multi-timestamp lines, e.g. `[00:12.30][00:24.50] Hello world`.
+  /// Handles multi-timestamp lines, e.g. `[00:12.30][00:24.50] Hello world`,
+  /// and ignores non-timestamp metadata tags like `[length:03:45]`, `[ar:Artist]`.
   List<LyricLine> parseLrc(String lrcContent) {
     final List<LyricLine> lyricLines = [];
     final lines = lrcContent.split('\n');
@@ -190,12 +194,20 @@ class LyricsService {
       final trimmed = rawLine.trim();
       if (trimmed.isEmpty) continue;
 
+      // Ignore pure metadata header lines like [ar:Artist], [ti:Title], [length:03:45]
+      if (_metadataTagRegex.hasMatch(trimmed) && !_timestampRegex.hasMatch(trimmed)) {
+        continue;
+      }
+
       // Find all timestamps in this line
       final matches = _timestampRegex.allMatches(trimmed).toList();
       if (matches.isEmpty) continue;
 
-      // Extract the lyric text after stripping all timestamps
-      final text = trimmed.replaceAll(_timestampRegex, '').trim();
+      // Extract the lyric text after stripping all timestamps and any inline metadata tags
+      final text = trimmed
+          .replaceAll(_timestampRegex, '')
+          .replaceAll(_metadataTagRegex, '')
+          .trim();
 
       // For every timestamp found on the line, add a LyricLine entry
       for (final match in matches) {
@@ -245,16 +257,32 @@ class LyricsService {
     }
 
     // Clean common YouTube video title clutter
-    track = track
-        .replaceAll(RegExp(r'\s*[\(\[](official\s*music\s*video|official\s*video|official\s*audio|lyrics?|lyric\s*video|visualizer|audio|4k|hd|remastered)[\)\]]', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s*\(?\s*ft\.?.*?\)?', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s*\(?\s*feat\.?.*?\)?', caseSensitive: false), '')
-        .trim();
+    // 1. Remove bracketed clutter: (Official Video), [4K], (Lyric Video), etc.
+    track = track.replaceAll(
+      RegExp(r'\s*[\(\[](?:official\s*(?:music\s*)?video|official\s*audio|lyrics?|lyric\s*video|visualizer|audio|4k|hd|remastered)[\)\]]', caseSensitive: false),
+      '',
+    );
+
+    // 2. Remove balanced bracketed featuring: (feat. Drake), [ft. Drake], (featuring XYZ)
+    track = track.replaceAll(
+      RegExp(r'\s*[\(\[]\s*\b(?:ft|feat|featuring)\b\.?[^\)\]]*[\)\]]', caseSensitive: false),
+      '',
+    );
+
+    // 3. Remove standalone featuring with word boundaries: "feat. Drake", "ft. Artist"
+    track = track.replaceAll(
+      RegExp(r'\s*\b(?:ft|feat|featuring)\b\.?\s+[^\(\[\-]+', caseSensitive: false),
+      '',
+    );
+
+    track = track.trim();
 
     if (artist != null) {
       artist = artist
           .replaceAll(RegExp(r'\s*-\s*Topic$', caseSensitive: false), '')
           .replaceAll(RegExp(r'\s*VEVO$', caseSensitive: false), '')
+          .replaceAll(RegExp(r'\s*[\(\[]\s*\b(?:ft|feat|featuring)\b\.?[^\)\]]*[\)\]]', caseSensitive: false), '')
+          .replaceAll(RegExp(r'\s*\b(?:ft|feat|featuring)\b\.?\s+[^\(\[\-]+', caseSensitive: false), '')
           .trim();
     }
 

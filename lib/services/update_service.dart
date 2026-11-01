@@ -32,14 +32,14 @@ class UpdateInfo {
 }
 
 class UpdateService {
-  // Mevcut uygulama sArAmA
-  static const String currentVersion = '3.0.1';
-  static const int currentBuildNumber = 6;
+  // Mevcut uygulama sürümü
+  static const String currentVersion = '3.0.2';
+  static const int currentBuildNumber = 7;
 
   static const String repoOwner = 'Ardaozhan';
   static const String repoName = 'pure_tube';
 
-  /// GitHub Releases API Azerinden en son sArAmA kontrol eder
+  /// GitHub Releases API üzerinden en son sürümü kontrol eder
   static Future<UpdateInfo?> checkForUpdate() async {
     try {
       final url = Uri.parse(
@@ -65,9 +65,9 @@ class UpdateService {
 
       if (cleanRemoteVersion.isEmpty) return null;
 
-      // Saraf sArAm karAYAlaAYtArmasA (Arn: 1.0.1 > 1.0.0)
+      // Sürüm karşılaştırması (Örn: 1.0.1 > 1.0.0)
       if (!_isRemoteVersionNewer(cleanRemoteVersion, currentVersion)) {
-        debugPrint('[UpdateService] Uygulama gAncel ($currentVersion >= $cleanRemoteVersion)');
+        debugPrint('[UpdateService] Uygulama güncel ($currentVersion >= $cleanRemoteVersion)');
         return null;
       }
 
@@ -86,7 +86,7 @@ class UpdateService {
       }
 
       if (apkDownloadUrl == null || apkDownloadUrl.isEmpty) {
-        debugPrint('[UpdateService] Release bulundu fakat APK asset bulunamadA.');
+        debugPrint('[UpdateService] Release bulundu fakat APK asset bulunamadı.');
         return null;
       }
 
@@ -94,18 +94,18 @@ class UpdateService {
         version: cleanRemoteVersion,
         tagName: tagName,
         releaseTitle: data['name'] as String? ?? 'PureTube $tagName',
-        releaseNotes: data['body'] as String? ?? 'Performans ve hata iyileAYtirmeleri.',
+        releaseNotes: data['body'] as String? ?? 'Performans ve hata iyileştirmeleri.',
         apkUrl: apkDownloadUrl,
         apkSize: apkSize,
         publishedAt: data['published_at'] != null ? DateTime.tryParse(data['published_at']) : null,
       );
     } catch (e) {
-      debugPrint('[UpdateService] GAncelleme kontrol hatasA: $e');
+      debugPrint('[UpdateService] Güncelleme kontrol hatası: $e');
       return null;
     }
   }
 
-  /// Semver karAYAlaAYtArma
+  /// Semver karşılaştırma
   static bool _isRemoteVersionNewer(String remote, String current) {
     try {
       final remoteParts = remote.split('.').map((e) => int.tryParse(e) ?? 0).toList();
@@ -123,11 +123,13 @@ class UpdateService {
     }
   }
 
-  /// APK dosyasAnA indirir ve Android Paket YAkleyicisini tetikler
+  /// APK dosyasını indirir ve Android Paket Yükleyicisini tetikler
   static Future<bool> downloadAndInstall({
     required String apkUrl,
     required Function(double progress, String status) onProgress,
   }) async {
+    final client = http.Client();
+    IOSink? sink;
     try {
       final tempDir = await getTemporaryDirectory();
       final filePath = '${tempDir.path}/puretube_update.apk';
@@ -137,20 +139,20 @@ class UpdateService {
         await file.delete();
       }
 
-      onProgress(0.01, 'BaAYlanAyor...');
+      onProgress(0.01, 'Başlanıyor...');
 
       final request = http.Request('GET', Uri.parse(apkUrl));
       request.headers['User-Agent'] = 'PureTube-App';
-      final response = await http.Client().send(request);
+      final response = await client.send(request);
 
       if (response.statusCode != 200) {
-        onProgress(0.0, 'Indirme sunucu hatasA: ${response.statusCode}');
+        onProgress(0.0, 'İndirme sunucu hatası: ${response.statusCode}');
         return false;
       }
 
       final totalBytes = response.contentLength ?? 0;
       int receivedBytes = 0;
-      final sink = file.openWrite();
+      sink = file.openWrite();
 
       await for (final chunk in response.stream) {
         sink.add(chunk);
@@ -169,10 +171,11 @@ class UpdateService {
 
       await sink.flush();
       await sink.close();
+      sink = null;
 
-      onProgress(1.0, 'Indirme tamamlandA! Kuruluma geA iliyor...');
+      onProgress(1.0, 'İndirme tamamlandı! Kuruluma geçiliyor...');
 
-      // Android Paket YAkleyiciyi aA 
+      // Android Paket Yükleyiciyi aç
       final result = await OpenFilex.open(
         filePath,
         type: 'application/vnd.android.package-archive',
@@ -181,9 +184,12 @@ class UpdateService {
       debugPrint('[UpdateService] OpenFilex result: ${result.type} - ${result.message}');
       return true;
     } catch (e) {
-      debugPrint('[UpdateService] Indirme/kurulum hatasA: $e');
-      onProgress(0.0, 'Hata oluAYtu: $e');
+      debugPrint('[UpdateService] İndirme/kurulum hatası: $e');
+      onProgress(0.0, 'Hata oluştu: $e');
       return false;
+    } finally {
+      await sink?.close();
+      client.close();
     }
   }
 
@@ -216,7 +222,7 @@ class UpdateService {
     }
   }
 
-  /// GAncelleme DiyaloAYu
+  /// Güncelleme Diyaloğu
   static void showUpdateDialog(BuildContext context, UpdateInfo update) {
     showDialog(
       context: context,
@@ -245,7 +251,7 @@ class _UpdateDialogWidgetState extends State<_UpdateDialogWidget> {
     setState(() {
       _isDownloading = true;
       _errorMessage = null;
-      _statusText = 'Indirme baAYlatAlAyor...';
+      _statusText = 'İndirme başlatılıyor...';
     });
 
     final success = await UpdateService.downloadAndInstall(
@@ -263,7 +269,7 @@ class _UpdateDialogWidgetState extends State<_UpdateDialogWidget> {
     if (!success && mounted) {
       setState(() {
         _isDownloading = false;
-        _errorMessage = _statusText.isNotEmpty ? _statusText : 'Indirme baAYarAsAz oldu.';
+        _errorMessage = _statusText.isNotEmpty ? _statusText : 'İndirme başarısız oldu.';
       });
     }
   }
@@ -289,7 +295,7 @@ class _UpdateDialogWidgetState extends State<_UpdateDialogWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Yeni SArAm Mevcut!',
+                  'Yeni Sürüm Mevcut!',
                   style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
                 ),
                 Text(
@@ -314,7 +320,7 @@ class _UpdateDialogWidgetState extends State<_UpdateDialogWidget> {
               ),
             ),
 
-          // Yenilikler KartA
+          // Yenilikler Kartı
           Container(
             width: double.infinity,
             constraints: const BoxConstraints(maxHeight: 140),
@@ -370,7 +376,7 @@ class _UpdateDialogWidgetState extends State<_UpdateDialogWidget> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           onPressed: _isDownloading ? null : _startDownload,
-          child: Text(_isDownloading ? 'Indiriliyor...' : 'AYimdi GAncelle'),
+          child: Text(_isDownloading ? 'İndiriliyor...' : 'Şimdi Güncelle'),
         ),
       ],
     );

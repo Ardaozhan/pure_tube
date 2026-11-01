@@ -6,7 +6,7 @@ import '../widgets/equalizer_sheet.dart';
 
 class SettingsDialog extends StatefulWidget {
   final int totalBlockedCount;
-  final Function(bool adBlock, bool sponsorBlock) onChanged;
+  final Function(bool adBlock, bool sponsorBlock, bool ryd) onChanged;
   final VoidCallback? onResetCounter;
 
   const SettingsDialog({
@@ -53,7 +53,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
     if (key == 'autoPipEnabled') {
       await PipService.setAutoPip(value);
     }
-    widget.onChanged(_adBlockEnabled, _sponsorBlockEnabled);
+    widget.onChanged(_adBlockEnabled, _sponsorBlockEnabled, _rydEnabled);
   }
 
   Future<void> _manualCheckUpdate() async {

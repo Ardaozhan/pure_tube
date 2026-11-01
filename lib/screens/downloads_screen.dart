@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 class DownloadedMediaItem {
@@ -54,6 +55,7 @@ class DownloadsScreenState extends State<DownloadsScreen> {
   Future<void> refreshList() async {
     setState(() => _isLoading = true);
     final List<DownloadedMediaItem> loaded = [];
+    final Set<String> seenPaths = <String>{};
 
     final List<Directory> searchDirs = [];
 
@@ -71,26 +73,30 @@ class DownloadsScreenState extends State<DownloadsScreen> {
     for (final dir in searchDirs) {
       if (await dir.exists()) {
         try {
-          final entities = dir.listSync();
-          for (final entity in entities) {
+          await for (final entity in dir.list(followLinks: false)) {
             if (entity is File) {
               final path = entity.path.toLowerCase();
               final isVideo = path.endsWith('.mp4') || path.endsWith('.webm') || path.endsWith('.mkv');
               final isAudio = path.endsWith('.m4a') || path.endsWith('.mp3') || path.endsWith('.opus') || path.endsWith('.aac');
 
               if (isVideo || isAudio) {
-                final stat = entity.statSync();
-                final rawName = entity.uri.pathSegments.last;
-                loaded.add(
-                  DownloadedMediaItem(
-                    file: entity,
-                    name: rawName,
-                    extension: rawName.split('.').last.toUpperCase(),
-                    sizeInBytes: stat.size,
-                    lastModified: stat.modified,
-                    isVideo: isVideo,
-                  ),
-                );
+                if (!seenPaths.add(entity.path.toLowerCase())) {
+                  continue;
+                }
+                try {
+                  final stat = await entity.stat();
+                  final rawName = p.basename(entity.path);
+                  loaded.add(
+                    DownloadedMediaItem(
+                      file: entity,
+                      name: rawName,
+                      extension: rawName.contains('.') ? rawName.split('.').last.toUpperCase() : '',
+                      sizeInBytes: stat.size,
+                      lastModified: stat.modified,
+                      isVideo: isVideo,
+                    ),
+                  );
+                } catch (_) {}
               }
             }
           }

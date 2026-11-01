@@ -160,6 +160,13 @@ class Id3v2Tagger {
   }) async {
     if (!await file.exists()) return;
 
+    // Do not prepend ID3v2 headers to WebM, M4A or MP4 containers
+    final filePathLower = file.path.toLowerCase();
+    if (!filePathLower.endsWith('.mp3')) {
+      debugPrint('[Id3v2Tagger] Skipping ID3v2 tag: file is not an MP3 container ($filePathLower)');
+      return;
+    }
+
     final isPng = coverImageBytes != null &&
         coverImageBytes.length > 8 &&
         coverImageBytes[0] == 0x89 &&
@@ -189,15 +196,19 @@ class Id3v2Tagger {
       }
     }
 
-    final sink = file.openWrite();
-    sink.add(tagBytes);
-    if (audioOffset > 0) {
-      sink.add(rawBytes.sublist(audioOffset));
-    } else {
-      sink.add(rawBytes);
+    IOSink? sink;
+    try {
+      sink = file.openWrite();
+      sink.add(tagBytes);
+      if (audioOffset > 0) {
+        sink.add(rawBytes.sublist(audioOffset));
+      } else {
+        sink.add(rawBytes);
+      }
+      await sink.flush();
+    } finally {
+      await sink?.close();
     }
-    await sink.flush();
-    await sink.close();
   }
 
   /// Downloads cover art from thumbnail URL and tags the audio file.
@@ -209,6 +220,7 @@ class Id3v2Tagger {
     String? lyrics,
     String? thumbnailUrl,
   }) async {
+    if (!file.path.toLowerCase().endsWith('.mp3')) return;
     List<int>? coverBytes;
     if (thumbnailUrl != null && thumbnailUrl.isNotEmpty) {
       try {
@@ -369,13 +381,21 @@ class DownloadService {
       Directory? baseDir;
       if (Platform.isAndroid) {
         final downloadDir = Directory('/storage/emulated/0/Download/PureTube');
-        if (!await downloadDir.exists()) {
-          try {
+        try {
+          if (!await downloadDir.exists()) {
             await downloadDir.create(recursive: true);
-            baseDir = downloadDir;
-          } catch (_) {}
-        } else {
+          }
+          // Validate write permissions under Scoped Storage (Android 11+)
+          final testFile = File('${downloadDir.path}/.access_test_${DateTime.now().millisecondsSinceEpoch}');
+          await testFile.writeAsString('test');
+          if (await testFile.exists()) {
+            await testFile.delete();
+          }
           baseDir = downloadDir;
+        } catch (_) {
+          // Android 11+ Scoped Storage restriction without MANAGE_EXTERNAL_STORAGE:
+          // Fall back to app-specific external storage where writes always succeed
+          baseDir = null;
         }
       }
 
@@ -420,8 +440,9 @@ class DownloadService {
         );
       }
 
-      // 5. Automatic ID3v2.3 Tagging for Audio Tracks
-      if (option.isAudioOnly && await file.exists()) {
+      // 5. Automatic ID3v2.3 Tagging for Audio Tracks (Only for MP3 containers)
+      final isMp3Container = ext.toLowerCase() == 'mp3';
+      if (option.isAudioOnly && isMp3Container && await file.exists()) {
         onProgress(0.98, 'Müzik etiketleri (ID3v2) ve kapak resmi işleniyor...');
         try {
           await Id3v2Tagger.tagFileWithThumbnailUrl(
@@ -435,6 +456,16 @@ class DownloadService {
         } catch (tagErr) {
           debugPrint('[DownloadService] ID3 tagging failed: $tagErr');
         }
+      }
+
+      // Verify destination file exists and is not empty
+      if (!await file.exists() || await file.length() == 0) {
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+        debugPrint('[DownloadService] Download produced an empty or missing file: $filePath');
+        onProgress(0.0, 'İndirme tamamlanamadı (boş dosya).');
+        return null;
       }
 
       onProgress(1.0, 'İndirme tamamlandı: $filePath');
@@ -498,12 +529,16 @@ class DownloadService {
 
       // Merge chunks sequentially into destination file
       onProgress(0.96, 'Parçalar birleştiriliyor...');
-      final outputSink = destinationFile.openWrite();
-      for (final part in partFiles) {
-        await outputSink.addStream(part.openRead());
+      IOSink? outputSink;
+      try {
+        outputSink = destinationFile.openWrite();
+        for (final part in partFiles) {
+          await outputSink.addStream(part.openRead());
+        }
+        await outputSink.flush();
+      } finally {
+        await outputSink?.close();
       }
-      await outputSink.flush();
-      await outputSink.close();
 
       _cleanupPartFiles(partFiles);
       return true;
@@ -523,6 +558,7 @@ class DownloadService {
     required Function(int receivedBytes) onBytesReceived,
   }) async {
     final client = http.Client();
+    IOSink? sink;
     try {
       final request = http.Request('GET', url);
       request.headers['Range'] = 'bytes=$start-$end';
@@ -532,7 +568,6 @@ class DownloadService {
 
       // Status 206 Partial Content is required for range requests
       if (response.statusCode != 206) {
-        client.close();
         return false;
       }
 
@@ -540,7 +575,7 @@ class DownloadService {
         await outputFile.delete();
       }
 
-      final sink = outputFile.openWrite();
+      sink = outputFile.openWrite();
       int received = 0;
 
       await for (final data in response.stream) {
@@ -550,12 +585,12 @@ class DownloadService {
       }
 
       await sink.flush();
-      await sink.close();
-      client.close();
       return true;
     } catch (_) {
-      client.close();
       return false;
+    } finally {
+      await sink?.close();
+      client.close();
     }
   }
 
@@ -567,25 +602,28 @@ class DownloadService {
     required Function(double progress, String status) onProgress,
   }) async {
     final stream = _yt.videos.streamsClient.get(streamInfo);
-    final output = destinationFile.openWrite();
+    IOSink? output;
+    try {
+      output = destinationFile.openWrite();
+      int received = 0;
 
-    int received = 0;
-
-    await for (final data in stream) {
-      received += data.length;
-      output.add(data);
-      if (totalBytes > 0) {
-        final progress = (received / totalBytes).clamp(0.0, 0.95);
-        final mb = (received / (1024 * 1024)).toStringAsFixed(1);
-        final totalMb = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
-        onProgress(progress, '${(progress * 100).toStringAsFixed(0)}% ($mb / $totalMb MB)');
-      } else {
-        onProgress(0.5, '${(received / (1024 * 1024)).toStringAsFixed(1)} MB');
+      await for (final data in stream) {
+        received += data.length;
+        output.add(data);
+        if (totalBytes > 0) {
+          final progress = (received / totalBytes).clamp(0.0, 0.95);
+          final mb = (received / (1024 * 1024)).toStringAsFixed(1);
+          final totalMb = (totalBytes / (1024 * 1024)).toStringAsFixed(1);
+          onProgress(progress, '${(progress * 100).toStringAsFixed(0)}% ($mb / $totalMb MB)');
+        } else {
+          onProgress(0.5, '${(received / (1024 * 1024)).toStringAsFixed(1)} MB');
+        }
       }
-    }
 
-    await output.flush();
-    await output.close();
+      await output.flush();
+    } finally {
+      await output?.close();
+    }
   }
 
   static void _cleanupPartFiles(List<File> partFiles) {
