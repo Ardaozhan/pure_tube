@@ -587,8 +587,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   automaticallyImplyLeading: false,
                   titleSpacing: 10,
                   title: Container(
-                    height: 38,
-                    padding: const EdgeInsets.all(3),
+                    height: 35,
+                    padding: const EdgeInsets.all(2.5),
                     decoration: BoxDecoration(
                       color: const Color(0xFF1A1A1A),
                       borderRadius: BorderRadius.circular(20),
@@ -613,7 +613,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeOutCubic,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: isYouTube ? Colors.redAccent : Colors.transparent,
                               borderRadius: BorderRadius.circular(16),
@@ -632,15 +632,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 Icon(
                                   Icons.play_arrow_rounded,
-                                  size: 18,
+                                  size: 16,
                                   color: isYouTube ? Colors.white : Colors.white60,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 3),
                                 Text(
                                   'YouTube',
                                   style: TextStyle(
                                     color: isYouTube ? Colors.white : Colors.white60,
-                                    fontSize: 12.5,
+                                    fontSize: 12,
                                     fontWeight: isYouTube ? FontWeight.bold : FontWeight.w500,
                                   ),
                                 ),
@@ -664,7 +664,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 220),
                             curve: Curves.easeOutCubic,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
                               color: isMusic ? const Color(0xFFFF2D55) : Colors.transparent,
                               borderRadius: BorderRadius.circular(16),
@@ -683,15 +683,15 @@ class _HomeScreenState extends State<HomeScreen> {
                               children: [
                                 Icon(
                                   Icons.music_note_rounded,
-                                  size: 16,
+                                  size: 15,
                                   color: isMusic ? Colors.white : Colors.white60,
                                 ),
-                                const SizedBox(width: 4),
+                                const SizedBox(width: 3),
                                 Text(
                                   'Müzik',
                                   style: TextStyle(
                                     color: isMusic ? Colors.white : Colors.white60,
-                                    fontSize: 12.5,
+                                    fontSize: 12,
                                     fontWeight: isMusic ? FontWeight.bold : FontWeight.w500,
                                   ),
                                 ),
@@ -708,7 +708,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onTap: _openSettingsDialog,
                       child: Container(
                         margin: const EdgeInsets.symmetric(vertical: 10),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
                           color: Colors.green.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(12),
@@ -717,8 +717,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 14),
-                            const SizedBox(width: 4),
+                            const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 13),
+                            const SizedBox(width: 3),
                             ValueListenableBuilder<int>(
                               valueListenable: _blockedCountNotifier,
                               builder: (context, count, _) => Text(
@@ -726,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 style: const TextStyle(
                                   color: Colors.greenAccent,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                 ),
                               ),
                             ),
@@ -734,7 +734,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 1),
+                    const SizedBox(width: 2),
 
                     // "İndir" button
                     IconButton(
@@ -742,28 +742,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.download_rounded, color: Colors.white, size: 19),
                       onPressed: _openDownloadModal,
-                    ),
-
-                    // "Kütüphane" button
-                    IconButton(
-                      tooltip: 'Kütüphane',
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: const Icon(Icons.video_library_rounded, color: Colors.white, size: 19),
-                      onPressed: _openLibraryScreen,
-                    ),
-
-                    // "İndirilenler" button
-                    IconButton(
-                      tooltip: 'İndirilenler',
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: const Icon(Icons.download_done_rounded, color: Colors.white70, size: 19),
-                      onPressed: _openDownloadsScreen,
                     ),
 
                     // "Ekolayzer" button
@@ -775,17 +755,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       icon: const Icon(Icons.tune_rounded, color: Color(0xFFFFD700), size: 19),
                       onPressed: () => EqualizerSheet.show(context),
                     ),
-
-                    // "Sözler" button (on Music tab or when music is playing)
-                    if (isMusic || _isPlaying)
-                      IconButton(
-                        tooltip: 'Şarkı Sözleri',
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                        icon: const Icon(Icons.lyrics_rounded, color: Color(0xFF64B5F6), size: 19),
-                        onPressed: _openLyricsSheet,
-                      ),
 
                     // PiP button (YouTube only)
                     if (isYouTube)
@@ -805,14 +774,83 @@ class _HomeScreenState extends State<HomeScreen> {
                         },
                       ),
 
-                    // Settings button
-                    IconButton(
-                      tooltip: 'Ayarlar',
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                      icon: const Icon(Icons.settings_rounded, color: Colors.white70, size: 19),
-                      onPressed: _openSettingsDialog,
+                    // More Menu (Kütüphane, İndirilenler, Sözler, Ayarlar)
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        cardColor: const Color(0xFF1E1E1E),
+                        popupMenuTheme: PopupMenuThemeData(
+                          color: const Color(0xFF1E1E1E),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            side: const BorderSide(color: Colors.white12, width: 0.8),
+                          ),
+                          elevation: 8,
+                        ),
+                      ),
+                      child: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 20),
+                        tooltip: 'Daha Fazla',
+                        offset: const Offset(0, 42),
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'lyrics':
+                              _openLyricsSheet();
+                              break;
+                            case 'library':
+                              _openLibraryScreen();
+                              break;
+                            case 'downloads':
+                              _openDownloadsScreen();
+                              break;
+                            case 'settings':
+                              _openSettingsDialog();
+                              break;
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'lyrics',
+                            child: Row(
+                              children: [
+                                Icon(Icons.lyrics_rounded, color: Color(0xFF64B5F6), size: 18),
+                                SizedBox(width: 12),
+                                Text('Şarkı Sözleri', style: TextStyle(color: Colors.white, fontSize: 13.5)),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'library',
+                            child: Row(
+                              children: [
+                                Icon(Icons.video_library_rounded, color: Colors.white, size: 18),
+                                SizedBox(width: 12),
+                                Text('Kütüphane & Geçmiş', style: TextStyle(color: Colors.white, fontSize: 13.5)),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'downloads',
+                            child: Row(
+                              children: [
+                                Icon(Icons.download_done_rounded, color: Colors.white, size: 18),
+                                SizedBox(width: 12),
+                                Text('İndirilenler', style: TextStyle(color: Colors.white, fontSize: 13.5)),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(height: 1),
+                          const PopupMenuItem(
+                            value: 'settings',
+                            child: Row(
+                              children: [
+                                Icon(Icons.settings_rounded, color: Colors.white70, size: 18),
+                                SizedBox(width: 12),
+                                Text('Ayarlar & Güvenlik', style: TextStyle(color: Colors.white70, fontSize: 13.5)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(width: 4),
                   ],
