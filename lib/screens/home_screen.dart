@@ -578,13 +578,12 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.black, // Pure OLED pitch-black (#000000)
         appBar: (_isFullscreen || _isInPip)
             ? null
-            : PreferredSize(
-                preferredSize: Size.fromHeight(_isLoading ? 52 : 50),
-                child: AppBar(
-                  backgroundColor: const Color(0xFF0F0F0F),
-                  elevation: 0,
-                  scrolledUnderElevation: 0,
-                  automaticallyImplyLeading: false,
+            : AppBar(
+                toolbarHeight: 52,
+                backgroundColor: const Color(0xFF0F0F0F),
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                automaticallyImplyLeading: false,
                   titleSpacing: 10,
                   title: Container(
                     height: 35,
@@ -868,7 +867,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         )
                       : null,
                 ),
-              ),
         body: SafeArea(
           top: false,
           bottom: !_isFullscreen && !_isInPip,
