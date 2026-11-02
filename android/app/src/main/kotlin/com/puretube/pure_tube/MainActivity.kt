@@ -461,9 +461,17 @@ class MainActivity : FlutterActivity() {
                     @Suppress("DEPRECATION")
                     window.windowManager.defaultDisplay
                 }
+                val currentMode = display?.mode
                 val modes = display?.supportedModes
-                val highestMode = modes?.maxByOrNull { it.refreshRate }
-                if (highestMode != null) {
+                val highestMode = if (currentMode != null) {
+                    modes?.filter {
+                        it.physicalWidth == currentMode.physicalWidth &&
+                                it.physicalHeight == currentMode.physicalHeight
+                    }?.maxByOrNull { it.refreshRate }
+                } else {
+                    modes?.maxByOrNull { it.refreshRate }
+                }
+                if (highestMode != null && highestMode.modeId != currentMode?.modeId) {
                     val params = window.attributes
                     params.preferredDisplayModeId = highestMode.modeId
                     window.attributes = params

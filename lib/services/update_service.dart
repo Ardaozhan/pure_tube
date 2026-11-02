@@ -33,8 +33,8 @@ class UpdateInfo {
 
 class UpdateService {
   // Mevcut uygulama sürümü
-  static const String currentVersion = '4.0.0';
-  static const int currentBuildNumber = 9;
+  static const String currentVersion = '4.1.0';
+  static const int currentBuildNumber = 10;
 
   static const String repoOwner = 'Ardaozhan';
   static const String repoName = 'pure_tube';

@@ -125,10 +125,7 @@ ytm-app-banner,
 ytd-enforcement-message-view-model,
 yt-playability-error-supported-renderers,
 .yt-playability-error-supported-renderers,
-tp-yt-paper-dialog:has(#feedback),
-tp-yt-iron-overlay-backdrop,
-ytd-popup-container:has(ytd-enforcement-message-view-model),
-.opened[modal] {
+ytd-popup-container:has(ytd-enforcement-message-view-model) {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
@@ -266,18 +263,6 @@ ytd-popup-container:has(ytd-enforcement-message-view-model),
 html,
 body {
     overscroll-behavior-y: contain !important;
-    scroll-behavior: smooth !important;
-}
-
-/* GPU Accelerated Layer Promotion */
-ytm-pivot-bar-renderer,
-ytmusic-nav-bar,
-ytmusic-player-bar,
-.player-container,
-video {
-    transform: translateZ(0) !important;
-    backface-visibility: hidden !important;
-    perspective: 1000px !important;
 }
 
 /* ==========================================================================

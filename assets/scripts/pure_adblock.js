@@ -110,6 +110,22 @@
     try {
         const originalFetch = window.fetch;
         window.fetch = async function(...args) {
+            try {
+                const reqUrl = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+                if (reqUrl && (
+                    reqUrl.includes('/pagead/') ||
+                    reqUrl.includes('/api/stats/ads') ||
+                    reqUrl.includes('/ptracking') ||
+                    reqUrl.includes('/ad_break') ||
+                    reqUrl.includes('/get_midroll_info') ||
+                    reqUrl.includes('doubleclick.net') ||
+                    reqUrl.includes('googlesyndication.com') ||
+                    reqUrl.includes('googleads.')
+                )) {
+                    notifyFlutter('onAdBlocked', { count: 1 });
+                    return new Response('', { status: 204, statusText: 'No Content' });
+                }
+            } catch(_) {}
             const response = await originalFetch.apply(this, args);
             try {
                 const reqUrl = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
@@ -155,6 +171,7 @@
                 this._url.includes('googleads')
             )) {
                 // Abort ad tracking requests silently
+                notifyFlutter('onAdBlocked', { count: 1 });
                 return;
             }
             if (this._url && (this._url.includes('/youtubei/v1/player') || this._url.includes('/youtubei/v1/next'))) {
@@ -233,16 +250,6 @@
             document.hasFocus = () => true;
         } catch(_) {}
 
-        if (typeof window.requestAnimationFrame === 'function') {
-            const _origRAF = window.requestAnimationFrame.bind(window);
-            window.requestAnimationFrame = function(callback) {
-                if (document.hidden || document.visibilityState === 'hidden' || !document.hasFocus()) {
-                    return setTimeout(() => callback(performance.now()), 16);
-                }
-                return _origRAF(callback);
-            };
-        }
-
         if (window.AudioContext || window.webkitAudioContext) {
             const AudioCtx = window.AudioContext || window.webkitAudioContext;
             if (AudioCtx.prototype && AudioCtx.prototype.suspend) {
@@ -296,7 +303,17 @@
             const handleMediaPauseEvent = (e) => {
                 const el = e.target;
                 if (el && (el.tagName === 'VIDEO' || el.tagName === 'AUDIO')) {
-                    isUserPaused = true;
+                    const timeSinceInteraction = Date.now() - lastUserInteractionTime;
+                    if (timeSinceInteraction < 800) {
+                        isUserPaused = true;
+                    } else if (!isUserPaused && !el.ended && el.currentTime > 0 && el.readyState >= 2) {
+                        setTimeout(() => {
+                            if (!isUserPaused && el.paused && !el.ended) {
+                                try { el.play(); } catch(_) {}
+                            }
+                        }, 150);
+                        return;
+                    }
                 }
                 syncMediaMetadata();
             };
@@ -749,10 +766,7 @@
             'ytd-enforcement-message-view-model, ' +
             'yt-playability-error-supported-renderers, ' +
             '.yt-playability-error-supported-renderers, ' +
-            'tp-yt-paper-dialog:has(#feedback), ' +
-            'tp-yt-iron-overlay-backdrop, ' +
-            'ytd-popup-container:has(ytd-enforcement-message-view-model), ' +
-            '.opened[modal]'
+            'ytd-popup-container:has(ytd-enforcement-message-view-model)'
         );
         if (modals.length > 0) {
             modals.forEach(el => {

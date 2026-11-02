@@ -37,11 +37,10 @@ class PurePlaybackService : Service() {
 
         fun stop(context: Context) {
             if (!isRunning) return
-            val intent = Intent(context, PurePlaybackService::class.java).apply {
-                action = "ACTION_STOP"
-            }
             try {
-                context.startService(intent)
+                val intent = Intent(context, PurePlaybackService::class.java)
+                context.stopService(intent)
+                isRunning = false
             } catch (e: Exception) {
                 Log.e("PureTube", "Failed to stop PurePlaybackService: ${e.message}")
             }
@@ -52,26 +51,28 @@ class PurePlaybackService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: "ACTION_START"
-        if (action == "ACTION_STOP") {
+        if (action == "ACTION_STOP" || intent == null) {
             releaseLocks()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-            } else {
-                @Suppress("DEPRECATION")
-                stopForeground(true)
-            }
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+            } catch (_: Exception) {}
             stopSelf()
             isRunning = false
             Log.i("PureTube", "PurePlaybackService stopped foreground")
             return START_NOT_STICKY
         }
 
-        val notificationId = intent?.getIntExtra("NOTIFICATION_ID", 1002) ?: 1002
+        val notificationId = intent.getIntExtra("NOTIFICATION_ID", 1002)
         val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent?.getParcelableExtra("NOTIFICATION", Notification::class.java)
+            intent.getParcelableExtra("NOTIFICATION", Notification::class.java)
         } else {
             @Suppress("DEPRECATION")
-            intent?.getParcelableExtra("NOTIFICATION")
+            intent.getParcelableExtra("NOTIFICATION")
         }
 
         if (notification != null) {
@@ -90,10 +91,17 @@ class PurePlaybackService : Service() {
                 Log.i("PureTube", "PurePlaybackService is running foreground with WakeLock and WifiLock (id: $notificationId)")
             } catch (e: Exception) {
                 Log.e("PureTube", "Error starting foreground service: ${e.message}")
+                stopSelf()
+                isRunning = false
+                return START_NOT_STICKY
             }
+        } else {
+            stopSelf()
+            isRunning = false
+            return START_NOT_STICKY
         }
 
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     private fun acquireLocks() {
@@ -148,6 +156,14 @@ class PurePlaybackService : Service() {
 
     override fun onDestroy() {
         releaseLocks()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+        } catch (_: Exception) {}
         isRunning = false
         Log.i("PureTube", "PurePlaybackService destroyed")
         super.onDestroy()

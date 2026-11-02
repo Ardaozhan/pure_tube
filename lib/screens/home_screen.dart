@@ -3,9 +3,9 @@ import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../services/adblock_filter.dart';
 import '../services/pip_service.dart';
 import '../services/media_notification_service.dart';
 import '../services/audio_dsp_service.dart';
@@ -115,8 +115,18 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadSettings();
     _setupPipListener();
     _setupMediaNotificationListener();
+    _requestNotificationPermission();
     AudioDspService().init();
     UpdateService.checkOnStartup(context);
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    try {
+      final status = await Permission.notification.status;
+      if (status.isDenied) {
+        await Permission.notification.request();
+      }
+    } catch (_) {}
   }
 
   void _setupMediaNotificationListener() {
@@ -584,152 +594,160 @@ class _HomeScreenState extends State<HomeScreen> {
                 elevation: 0,
                 scrolledUnderElevation: 0,
                 automaticallyImplyLeading: false,
-                  titleSpacing: 10,
-                  title: Container(
-                    height: 35,
-                    padding: const EdgeInsets.all(2.5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white12, width: 0.8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // YouTube Pill
-                        GestureDetector(
-                          onTap: () {
-                            if (_currentTabIndex != 0) {
-                              _ytMusicController?.evaluateJavascript(
-                                source: 'if (window.pureTubeControl) window.pureTubeControl.pause();',
-                              );
-                              setState(() {
-                                _currentTabIndex = 0;
-                              });
-                              PipService.setAutoPip(_autoPipEnabled);
-                            }
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOutCubic,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isYouTube ? Colors.redAccent : Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: isYouTube
-                                  ? [
-                                      BoxShadow(
-                                        color: Colors.redAccent.withValues(alpha: 0.4),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.play_arrow_rounded,
-                                  size: 16,
-                                  color: isYouTube ? Colors.white : Colors.white60,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'YouTube',
-                                  style: TextStyle(
-                                    color: isYouTube ? Colors.white : Colors.white60,
-                                    fontSize: 12,
-                                    fontWeight: isYouTube ? FontWeight.bold : FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        // Music Pill
-                        GestureDetector(
-                          onTap: () {
-                            if (_currentTabIndex != 1) {
-                              _ytController?.evaluateJavascript(
-                                source: 'if (window.pureTubeControl) window.pureTubeControl.pause();',
-                              );
-                              setState(() {
-                                _currentTabIndex = 1;
-                              });
-                              PipService.setAutoPip(false);
-                            }
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOutCubic,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isMusic ? const Color(0xFFFF2D55) : Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: isMusic
-                                  ? [
-                                      BoxShadow(
-                                        color: const Color(0xFFFF2D55).withValues(alpha: 0.4),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.music_note_rounded,
-                                  size: 15,
-                                  color: isMusic ? Colors.white : Colors.white60,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'Müzik',
-                                  style: TextStyle(
-                                    color: isMusic ? Colors.white : Colors.white60,
-                                    fontSize: 12,
-                                    fontWeight: isMusic ? FontWeight.bold : FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  actions: [
-                    // Ad Shield Counter
-                    GestureDetector(
-                      onTap: _openSettingsDialog,
+                  titleSpacing: 8,
+                  title: MediaQuery.withNoTextScaling(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
                       child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 10),
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        height: 34,
+                        padding: const EdgeInsets.all(2.5),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.35)),
+                          color: const Color(0xFF1A1A1A),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white12, width: 0.8),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 13),
-                            const SizedBox(width: 3),
-                            ValueListenableBuilder<int>(
-                              valueListenable: _blockedCountNotifier,
-                              builder: (context, count, _) => Text(
-                                '$count',
-                                style: const TextStyle(
-                                  color: Colors.greenAccent,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 11.5,
+                            // YouTube Pill
+                            GestureDetector(
+                              onTap: () {
+                                if (_currentTabIndex != 0) {
+                                  _ytMusicController?.evaluateJavascript(
+                                    source: 'if (window.pureTubeControl) window.pureTubeControl.pause();',
+                                  );
+                                  setState(() {
+                                    _currentTabIndex = 0;
+                                  });
+                                  PipService.setAutoPip(_autoPipEnabled);
+                                }
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOutCubic,
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isYouTube ? Colors.redAccent : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: isYouTube
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.redAccent.withValues(alpha: 0.4),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.play_arrow_rounded,
+                                      size: 15,
+                                      color: isYouTube ? Colors.white : Colors.white60,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'YouTube',
+                                      style: TextStyle(
+                                        color: isYouTube ? Colors.white : Colors.white60,
+                                        fontSize: 11.5,
+                                        fontWeight: isYouTube ? FontWeight.bold : FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Music Pill
+                            GestureDetector(
+                              onTap: () {
+                                if (_currentTabIndex != 1) {
+                                  _ytController?.evaluateJavascript(
+                                    source: 'if (window.pureTubeControl) window.pureTubeControl.pause();',
+                                  );
+                                  setState(() {
+                                    _currentTabIndex = 1;
+                                  });
+                                  PipService.setAutoPip(false);
+                                }
+                              },
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 220),
+                                curve: Curves.easeOutCubic,
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: isMusic ? const Color(0xFFFF2D55) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: isMusic
+                                      ? [
+                                          BoxShadow(
+                                            color: const Color(0xFFFF2D55).withValues(alpha: 0.4),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.music_note_rounded,
+                                      size: 14,
+                                      color: isMusic ? Colors.white : Colors.white60,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'Müzik',
+                                      style: TextStyle(
+                                        color: isMusic ? Colors.white : Colors.white60,
+                                        fontSize: 11.5,
+                                        fontWeight: isMusic ? FontWeight.bold : FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    // Ad Shield Counter
+                    MediaQuery.withNoTextScaling(
+                      child: GestureDetector(
+                        onTap: _openSettingsDialog,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.shield_rounded, color: Colors.greenAccent, size: 13),
+                              const SizedBox(width: 3),
+                              ValueListenableBuilder<int>(
+                                valueListenable: _blockedCountNotifier,
+                                builder: (context, count, _) => Text(
+                                  '$count',
+                                  style: const TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -896,10 +914,11 @@ class _HomeScreenState extends State<HomeScreen> {
       mediaPlaybackRequiresUserGesture: false,
       allowsInlineMediaPlayback: true,
       allowBackgroundAudioPlaying: true,
-      useShouldInterceptRequest: true,
+      useShouldInterceptRequest: false,
+      thirdPartyCookiesEnabled: true,
       supportZoom: false,
       userAgent:
-          'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36',
+          'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
       supportMultipleWindows: false,
       verticalScrollBarEnabled: false,
       horizontalScrollBarEnabled: false,
@@ -909,7 +928,7 @@ class _HomeScreenState extends State<HomeScreen> {
       databaseEnabled: true,
       cacheEnabled: true,
       cacheMode: CacheMode.LOAD_DEFAULT,
-      useHybridComposition: false, // TLHC - Texture Layer Hybrid Composition (instant rendering)
+      useHybridComposition: true,
       offscreenPreRaster: true,
       overScrollMode: OverScrollMode.IF_CONTENT_SCROLLS,
       scrollBarStyle: ScrollBarStyle.SCROLLBARS_INSIDE_OVERLAY,
@@ -1145,47 +1164,6 @@ class _HomeScreenState extends State<HomeScreen> {
             title: pageTitle,
           );
         }
-      },
-      shouldInterceptRequest: (controller, request) async {
-        if (!_adBlockEnabled) return null;
-
-        final uri = request.url;
-        final host = uri.host;
-
-        // Fast-path: Immediately bypass YouTube CDN & media streams without filtering overhead
-        if (host.endsWith('.googlevideo.com') ||
-            host.endsWith('.ytimg.com') ||
-            host.endsWith('.ggpht.com') ||
-            host.endsWith('.gstatic.com') ||
-            host == 'fonts.googleapis.com' ||
-            host == 'fonts.gstatic.com') {
-          return null;
-        }
-
-        // On youtube / ytmusic domains, only intercept known ad-tracking paths
-        if (host == 'm.youtube.com' || host == 'music.youtube.com') {
-          final path = uri.path;
-          if (path.startsWith('/pagead') ||
-              path.startsWith('/api/stats/ads') ||
-              path.startsWith('/ptracking') ||
-              path.startsWith('/ad_break')) {
-            _incrementBlockedCount();
-            return WebResourceResponse(
-              contentType: 'text/plain',
-              data: Uint8List(0),
-            );
-          }
-          return null;
-        }
-
-        if (AdBlockFilter.shouldBlock(uri)) {
-          _incrementBlockedCount();
-          return WebResourceResponse(
-            contentType: 'text/plain',
-            data: Uint8List(0),
-          );
-        }
-        return null;
       },
     );
 
